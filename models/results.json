@@ -1,0 +1,350 @@
+{
+  "regression": {
+    "linear_regression": {
+      "metrics": {
+        "RMSE": 20.20726618281621,
+        "MAE": 16.69194636019449,
+        "R2": 0.1532133186501795
+      },
+      "params": {
+        "copy_X": true,
+        "fit_intercept": true,
+        "n_jobs": null,
+        "positive": false,
+        "tol": 1e-06
+      },
+      "feature_engineering": "StandardScaler applied to all 4 numeric features.",
+      "top3_features": [
+        [
+          "quiz2_score",
+          5.305435119178056
+        ],
+        [
+          "assignment_score",
+          3.4686667276165686
+        ],
+        [
+          "quiz1_score",
+          3.3565677349195715
+        ]
+      ]
+    },
+    "polynomial_regression": {
+      "metrics": {
+        "RMSE": 20.70975253009611,
+        "MAE": 17.18041296615134,
+        "R2": 0.1105762692141663
+      },
+      "params": {
+        "degree": 2,
+        "copy_X": true,
+        "fit_intercept": true,
+        "n_jobs": null,
+        "positive": false,
+        "tol": 1e-06
+      },
+      "feature_engineering": "StandardScaler + PolynomialFeatures(degree=2) on all 4 features.",
+      "top3_features": [
+        [
+          "quiz2_score",
+          5.06259611636888
+        ],
+        [
+          "assignment_score",
+          3.417866144379866
+        ],
+        [
+          "quiz1_score",
+          3.3248197742516994
+        ]
+      ]
+    },
+    "xgboost_regression": {
+      "metrics": {
+        "RMSE": 21.78248012577281,
+        "MAE": 18.002586364746094,
+        "R2": 0.016048848628997803
+      },
+      "params": {
+        "objective": "reg:squarederror",
+        "base_score": null,
+        "booster": null,
+        "callbacks": null,
+        "colsample_bylevel": null,
+        "colsample_bynode": null,
+        "colsample_bytree": 0.9,
+        "device": null,
+        "early_stopping_rounds": null,
+        "enable_categorical": true,
+        "eval_metric": "rmse",
+        "feature_types": null,
+        "feature_weights": null,
+        "gamma": null,
+        "grow_policy": null,
+        "importance_type": null,
+        "interaction_constraints": null,
+        "learning_rate": 0.05,
+        "max_bin": null,
+        "max_cat_threshold": null,
+        "max_cat_to_onehot": null,
+        "max_delta_step": null,
+        "max_depth": 4,
+        "max_leaves": null,
+        "min_child_weight": null,
+        "missing": NaN,
+        "monotone_constraints": null,
+        "multi_strategy": null,
+        "n_estimators": 200,
+        "n_jobs": null,
+        "num_parallel_tree": null,
+        "random_state": 42,
+        "reg_alpha": null,
+        "reg_lambda": null,
+        "sampling_method": null,
+        "scale_pos_weight": null,
+        "subsample": 0.9,
+        "tree_method": null,
+        "validate_parameters": null,
+        "verbosity": null
+      },
+      "feature_engineering": "None required (tree-based); raw numeric features used directly.",
+      "top3_features": [
+        [
+          "assignment_score",
+          0.27420663833618164
+        ],
+        [
+          "quiz2_score",
+          0.2736207842826843
+        ],
+        [
+          "quiz1_score",
+          0.2285502403974533
+        ]
+      ]
+    }
+  },
+  "classification": {
+    "logistic_regression": {
+      "metrics": {
+        "Accuracy": 0.4507042253521127,
+        "Precision": 0.22666666666666668,
+        "Recall": 0.32164634146341464,
+        "F1": 0.264714737317477
+      },
+      "params": {
+        "C": 1.0,
+        "class_weight": null,
+        "dual": false,
+        "fit_intercept": true,
+        "intercept_scaling": 1,
+        "l1_ratio": 0.0,
+        "max_iter": 1000,
+        "n_jobs": null,
+        "penalty": "deprecated",
+        "random_state": 42,
+        "solver": "lbfgs",
+        "tol": 0.0001,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "feature_engineering": "StandardScaler applied to all 4 numeric features.",
+      "top3_features": [
+        [
+          "assignment_score",
+          0.19953567218483131
+        ],
+        [
+          "quiz1_score",
+          0.1987130509874478
+        ],
+        [
+          "quiz2_score",
+          0.19141043457924853
+        ]
+      ]
+    },
+    "decision_tree": {
+      "metrics": {
+        "Accuracy": 0.4084507042253521,
+        "Precision": 0.3235542020425741,
+        "Recall": 0.3143873403019744,
+        "F1": 0.30493147421482136
+      },
+      "params": {
+        "ccp_alpha": 0.0,
+        "class_weight": null,
+        "criterion": "gini",
+        "max_depth": 5,
+        "max_features": null,
+        "max_leaf_nodes": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 8,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "monotonic_cst": null,
+        "random_state": 42,
+        "splitter": "best"
+      },
+      "feature_engineering": "None required (tree-based); raw numeric features used directly.",
+      "top3_features": [
+        [
+          "quiz2_score",
+          0.2948376260544719
+        ],
+        [
+          "Attendance_Rate",
+          0.2574664182227435
+        ],
+        [
+          "quiz1_score",
+          0.22650235817191308
+        ]
+      ]
+    },
+    "random_forest": {
+      "metrics": {
+        "Accuracy": 0.38028169014084506,
+        "Precision": 0.19782608695652176,
+        "Recall": 0.27047038327526135,
+        "F1": 0.22673594709494566,
+        "OOB_Score": 0.36925795053003535
+      },
+      "params": {
+        "bootstrap": true,
+        "ccp_alpha": 0.0,
+        "class_weight": null,
+        "criterion": "gini",
+        "max_depth": 8,
+        "max_features": "sqrt",
+        "max_leaf_nodes": null,
+        "max_samples": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 4,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "monotonic_cst": null,
+        "n_estimators": 300,
+        "n_jobs": null,
+        "oob_score": true,
+        "random_state": 42,
+        "verbose": 0,
+        "warm_start": false
+      },
+      "feature_engineering": "None required (tree-based); raw numeric features used directly.",
+      "top3_features": [
+        [
+          "Attendance_Rate",
+          0.3136290760474989
+        ],
+        [
+          "quiz2_score",
+          0.242350722921859
+        ],
+        [
+          "quiz1_score",
+          0.2244644906117517
+        ]
+      ]
+    },
+    "knn": {
+      "metrics": {
+        "Accuracy": 0.3873239436619718,
+        "Precision": 0.3341349795485532,
+        "Recall": 0.29682055749128916,
+        "F1": 0.2846140293908346
+      },
+      "params": {
+        "algorithm": "auto",
+        "leaf_size": 30,
+        "metric": "minkowski",
+        "metric_params": null,
+        "n_jobs": null,
+        "n_neighbors": 9,
+        "p": 2,
+        "weights": "uniform"
+      },
+      "feature_engineering": "StandardScaler applied to all 4 numeric features (distance-based model).",
+      "top3_features": [
+        [
+          "quiz2_score",
+          0.03415492957746478
+        ],
+        [
+          "assignment_score",
+          0.031690140845070415
+        ],
+        [
+          "Attendance_Rate",
+          0.007042253521126749
+        ]
+      ]
+    },
+    "xgboost_classification": {
+      "metrics": {
+        "Accuracy": 0.38028169014084506,
+        "Precision": 0.269813829787234,
+        "Recall": 0.27805603948896634,
+        "F1": 0.2508116883116883
+      },
+      "params": {
+        "objective": "multi:softprob",
+        "base_score": null,
+        "booster": null,
+        "callbacks": null,
+        "colsample_bylevel": null,
+        "colsample_bynode": null,
+        "colsample_bytree": 0.9,
+        "device": null,
+        "early_stopping_rounds": null,
+        "enable_categorical": true,
+        "eval_metric": "mlogloss",
+        "feature_types": null,
+        "feature_weights": null,
+        "gamma": null,
+        "grow_policy": null,
+        "importance_type": null,
+        "interaction_constraints": null,
+        "learning_rate": 0.05,
+        "max_bin": null,
+        "max_cat_threshold": null,
+        "max_cat_to_onehot": null,
+        "max_delta_step": null,
+        "max_depth": 4,
+        "max_leaves": null,
+        "min_child_weight": null,
+        "missing": NaN,
+        "monotone_constraints": null,
+        "multi_strategy": null,
+        "n_estimators": 200,
+        "n_jobs": null,
+        "num_parallel_tree": null,
+        "random_state": 42,
+        "reg_alpha": null,
+        "reg_lambda": null,
+        "sampling_method": null,
+        "scale_pos_weight": null,
+        "subsample": 0.9,
+        "tree_method": null,
+        "validate_parameters": null,
+        "verbosity": null,
+        "num_class": 4
+      },
+      "feature_engineering": "None required (tree-based); raw numeric features used directly.",
+      "top3_features": [
+        [
+          "Attendance_Rate",
+          0.2611558437347412
+        ],
+        [
+          "quiz2_score",
+          0.2520226836204529
+        ],
+        [
+          "assignment_score",
+          0.24803224205970764
+        ]
+      ]
+    }
+  }
+}

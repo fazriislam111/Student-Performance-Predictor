@@ -1,0 +1,35 @@
+{
+  "features": [
+    "Attendance_Rate",
+    "quiz1_score",
+    "quiz2_score",
+    "assignment_score"
+  ],
+  "regression_target": "total_score",
+  "classification_target": "performance",
+  "class_order": [
+    "fail",
+    "poor",
+    "average",
+    "good"
+  ],
+  "feature_ranges": {
+    "Attendance_Rate": [
+      50.11696953128892,
+      99.96767497829174
+    ],
+    "quiz1_score": [
+      0.0,
+      15.0
+    ],
+    "quiz2_score": [
+      0.0,
+      15.0
+    ],
+    "assignment_score": [
+      0.0,
+      10.0
+    ]
+  },
+  "n_rows": 708
+}

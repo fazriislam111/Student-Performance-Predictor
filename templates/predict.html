@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Predict | Student Performance Predictor{% endblock %}
+{% block content %}
+<h1>Predict Performance</h1>
+<p class="subtitle">Choose a model type, pick a specific model, enter the student's data, and get a prediction.</p>
+
+<div class="predict-grid">
+  <div class="panel">
+    <label for="task-select"><strong>1. Model Category</strong></label>
+    <select id="task-select">
+      <option value="regression">Regression Models (predict Total Score)</option>
+      <option value="classification">Classification Models (predict Performance)</option>
+    </select>
+
+    <label for="model-select"><strong>2. Model</strong></label>
+    <select id="model-select"></select>
+
+    <div id="feature-inputs"><strong>3. Student Data</strong></div>
+
+    <button id="predict-btn">Predict</button>
+  </div>
+
+  <div class="panel result-panel">
+    <h3>Result</h3>
+    <div id="result-box" class="result-box">Fill in the form and click Predict.</div>
+    <div id="proba-box"></div>
+  </div>
+</div>
+
+<script>
+const regModels = {{ reg_models | tojson }};
+const clsModels = {{ cls_models | tojson }};
+const features = {{ features | tojson }};
+const featureLabels = {{ feature_labels | tojson }};
+const featureRanges = {{ feature_ranges | tojson }};
+
+const taskSelect = document.getElementById('task-select');
+const modelSelect = document.getElementById('model-select');
+const featureInputsDiv = document.getElementById('feature-inputs');
+const resultBox = document.getElementById('result-box');
+const probaBox = document.getElementById('proba-box');
+
+function populateModels() {
+  const models = taskSelect.value === 'regression' ? regModels : clsModels;
+  modelSelect.innerHTML = '';
+  for (const key in models) {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = models[key].label;
+    modelSelect.appendChild(opt);
+  }
+}
+
+function buildFeatureInputs() {
+  featureInputsDiv.innerHTML = '<strong>3. Student Data</strong>';
+  features.forEach(f => {
+    const range = featureRanges[f];
+    const wrapper = document.createElement('div');
+    wrapper.className = 'input-row';
+    const label = document.createElement('label');
+    label.textContent = featureLabels[f] || f;
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.step = 'any';
+    input.id = 'feat-' + f;
+    input.placeholder = `e.g. ${((range[0]+range[1])/2).toFixed(1)} (range ${range[0].toFixed(1)}-${range[1].toFixed(1)})`;
+    wrapper.appendChild(label);
+    wrapper.appendChild(input);
+    featureInputsDiv.appendChild(wrapper);
+  });
+}
+
+taskSelect.addEventListener('change', () => { populateModels(); });
+populateModels();
+buildFeatureInputs();
+
+document.getElementById('predict-btn').addEventListener('click', async () => {
+  const task = taskSelect.value;
+  const model = modelSelect.value;
+  const featureValues = {};
+  let valid = true;
+  features.forEach(f => {
+    const val = document.getElementById('feat-' + f).value;
+    if (val === '') valid = false;
+    featureValues[f] = val;
+  });
+
+  if (!valid) {
+    resultBox.textContent = 'Please fill in all fields.';
+    resultBox.className = 'result-box error';
+    return;
+  }
+
+  resultBox.textContent = 'Predicting...';
+  resultBox.className = 'result-box';
+  probaBox.innerHTML = '';
+
+  try {
+    const res = await fetch('/api/predict', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task, model, features: featureValues})
+    });
+    const data = await res.json();
+    if (data.error) {
+      resultBox.textContent = data.error;
+      resultBox.className = 'result-box error';
+      return;
+    }
+    resultBox.innerHTML = `<span class="result-label">${data.label}:</span> <span class="result-value">${data.prediction}</span>`;
+    resultBox.className = 'result-box success';
+
+    if (data.probabilities) {
+      let html = '<h4>Class Probabilities</h4><ul class="proba-list">';
+      for (const [cls, p] of Object.entries(data.probabilities)) {
+        html += `<li><span>${cls}</span><div class="proba-bar-bg"><div class="proba-bar" style="width:${p*100}%"></div></div><span>${(p*100).toFixed(1)}%</span></li>`;
+      }
+      html += '</ul>';
+      probaBox.innerHTML = html;
+    }
+  } catch (e) {
+    resultBox.textContent = 'Something went wrong. Please try again.';
+    resultBox.className = 'result-box error';
+  }
+});
+</script>
+{% endblock %}

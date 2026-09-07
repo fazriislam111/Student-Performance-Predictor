@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}EDA | Student Performance Predictor{% endblock %}
+{% block content %}
+<h1>Exploratory Data Analysis</h1>
+<p class="subtitle">A visual overview of the student performance dataset before modeling.</p>
+
+<div class="eda-list">
+  {% for plot in plots %}
+  <div class="eda-item">
+    <h3>{{ plot.title }}</h3>
+    <img src="{{ url_for('static', filename='plots/eda/' + plot.file) }}" alt="{{ plot.title }}">
+    <p>{{ plot.desc }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

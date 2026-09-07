@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Student Performance Predictor{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><a href="{{ url_for('home') }}">📊 Student Performance Predictor</a></div>
+  <nav>
+    <a href="{{ url_for('eda') }}" class="{{ 'active' if request.path == '/eda' else '' }}">EDA</a>
+    <a href="{{ url_for('predict_page') }}" class="{{ 'active' if request.path == '/predict' else '' }}">Predict Performance</a>
+    <a href="{{ url_for('analyze_page') }}" class="{{ 'active' if request.path == '/analyze' else '' }}">Analyze Models</a>
+  </nav>
+</header>
+<main class="container">
+  {% block content %}{% endblock %}
+</main>
+<footer>
+  <p>University Project &mdash; Student Performance Prediction (Regression &amp; Classification)</p>
+</footer>
+</body>
+</html>

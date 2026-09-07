@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Home | Student Performance Predictor{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Student Performance Prediction</h1>
+  <p>An end-to-end machine learning project that explores student data, predicts total scores
+     and performance categories, and lets you inspect exactly how each model works.</p>
+</section>
+
+<section class="card-grid">
+  <a class="feature-card" href="{{ url_for('eda') }}">
+    <h2>📈 EDA</h2>
+    <p>Explore distributions, correlations, class balance, and feature relationships in the dataset.</p>
+  </a>
+  <a class="feature-card" href="{{ url_for('predict_page') }}">
+    <h2>🔮 Predict Performance</h2>
+    <p>Enter a student's attendance and scores to predict their total score or performance category
+       using any of the 8 trained models.</p>
+  </a>
+  <a class="feature-card" href="{{ url_for('analyze_page') }}">
+    <h2>🔬 Analyze Models</h2>
+    <p>Inspect hyperparameters, feature engineering, and detailed interpretation plots for every model.</p>
+  </a>
+</section>
+
+<section class="summary">
+  <h3>Project Overview</h3>
+  <ul>
+    <li><strong>Regression models</strong> (predicting total score): Linear Regression, XGBoost, Polynomial Regression</li>
+    <li><strong>Classification models</strong> (predicting performance: fail / poor / average / good): Logistic Regression, Decision Tree, Random Forest, KNN, XGBoost</li>
+    <li><strong>Features used:</strong> Attendance Rate, Quiz 1 Score, Quiz 2 Score, Assignment Score</li>
+  </ul>
+</section>
+{% endblock %}

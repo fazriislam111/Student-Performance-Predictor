@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Analyze | Student Performance Predictor{% endblock %}
+{% block content %}
+<h1>Analyze Models</h1>
+<p class="subtitle">Pick a model to see its hyperparameters, feature engineering, and interpretation plots.</p>
+
+<div class="analyze-layout">
+  <aside class="model-list">
+    <h3>Regression Models</h3>
+    <ul>
+      {% for key, m in reg_models.items() %}
+      <li><button class="model-btn" data-key="{{ key }}">{{ m.label }}</button></li>
+      {% endfor %}
+    </ul>
+    <h3>Classification Models</h3>
+    <ul>
+      {% for key, m in cls_models.items() %}
+      <li><button class="model-btn" data-key="{{ key }}">{{ m.label }}</button></li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <section class="model-detail" id="model-detail">
+    <p class="placeholder">Select a model from the list to view its analysis.</p>
+  </section>
+</div>
+
+<script>
+document.querySelectorAll('.model-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const key = btn.dataset.key;
+    const detail = document.getElementById('model-detail');
+    detail.innerHTML = '<p class="placeholder">Loading...</p>';
+
+    const res = await fetch(`/api/analyze/${key}`);
+    const data = await res.json();
+    if (data.error) {
+      detail.innerHTML = `<p class="placeholder">${data.error}</p>`;
+      return;
+    }
+
+    let metricsHtml = '<div class="metrics-row">';
+    for (const [k, v] of Object.entries(data.metrics)) {
+      metricsHtml += `<div class="metric-pill"><span>${k}</span><strong>${typeof v === 'number' ? v.toFixed(3) : v}</strong></div>`;
+    }
+    metricsHtml += '</div>';
+
+    let paramsHtml = '<table class="params-table"><tbody>';
+    for (const [k, v] of Object.entries(data.params)) {
+      paramsHtml += `<tr><td>${k}</td><td>${v}</td></tr>`;
+    }
+    paramsHtml += '</tbody></table>';
+
+    let top3Html = '<ul class="top3-list">';
+    data.top3_features.forEach(([name, val]) => {
+      top3Html += `<li>${name}: <strong>${val.toFixed(3)}</strong></li>`;
+    });
+    top3Html += '</ul>';
+
+    let plotsHtml = '';
+    data.plots.forEach(p => {
+      plotsHtml += `<div class="analysis-plot">
+        <img src="/static/plots/analysis/${p.file}" alt="${p.file}">
+        <p>${p.desc}</p>
+      </div>`;
+    });
+
+    detail.innerHTML = `
+      <h2>${data.label}</h2>
+      <h4>Test Performance</h4>
+      ${metricsHtml}
+
+      <div class="two-col">
+        <div>
+          <h4>Model Parameters / Settings</h4>
+          ${paramsHtml}
+        </div>
+        <div>
+          <h4>Feature Engineering</h4>
+          <p>${data.feature_engineering}</p>
+          <h4>Top 3 Important Features</h4>
+          ${top3Html}
+          <img class="importance-img" src="/static/plots/importance/${data.importance_plot}" alt="Top 3 feature importance">
+        </div>
+      </div>
+
+      <h4>Detailed Analysis &amp; Interpretation</h4>
+      <div class="plots-list">
+        ${plotsHtml}
+      </div>
+    `;
+  });
+});
+</script>
+{% endblock %}
