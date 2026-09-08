@@ -6,3 +6,4 @@ xgboost>=2.0
 matplotlib>=3.8
 seaborn>=0.13
 shap>=0.44
+gunicorn>=21.2
