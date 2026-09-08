@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import random
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,20 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "models")
+DATA_PATH = os.path.join(BASE_DIR, "data", "student_data.csv")
+
+RAW_COLUMN_RENAME = {
+    "quiz1_score out of 15": "quiz1_score",
+    "quiz2_score out of 15": "quiz2_score",
+    "assignment_score out of 10": "assignment_score",
+    "total score": "total_score",
+}
+
+
+def load_dataframe():
+    df = pd.read_csv(DATA_PATH)
+    df = df.rename(columns=RAW_COLUMN_RENAME)
+    return df
 
 with open(os.path.join(MODEL_DIR, "metadata.json")) as f:
     METADATA = json.load(f)
@@ -70,7 +85,24 @@ _model_cache = {}
 def load_bundle(pickle_name):
     if pickle_name not in _model_cache:
         with open(os.path.join(MODEL_DIR, pickle_name), "rb") as f:
-            _model_cache[pickle_name] = pickle.load(f)
+            bundle = pickle.load(f)
+
+        # XGBoost models are stored via their native save format (version-stable)
+        # rather than raw pickle, because pickling a Booster directly breaks
+        # across different xgboost versions/platforms. Reconstruct here.
+        model_type = bundle.get("model_type")
+        if model_type == "xgb_regressor":
+            from xgboost import XGBRegressor
+            m = XGBRegressor()
+            m.load_model(os.path.join(MODEL_DIR, bundle["native_path"]))
+            bundle["model"] = m
+        elif model_type == "xgb_classifier":
+            from xgboost import XGBClassifier
+            m = XGBClassifier()
+            m.load_model(os.path.join(MODEL_DIR, bundle["native_path"]))
+            bundle["model"] = m
+
+        _model_cache[pickle_name] = bundle
     return _model_cache[pickle_name]
 
 
@@ -218,7 +250,25 @@ def home():
 
 @app.route("/eda")
 def eda():
-    return render_template("eda.html", plots=EDA_PLOTS)
+    df = load_dataframe()
+
+    shape_info = {"rows": df.shape[0], "columns": df.shape[1]}
+    dtypes_info = [{"column": col, "dtype": str(dtype)} for col, dtype in df.dtypes.items()]
+
+    sample_df = df.sample(n=5, random_state=random.randint(0, 1_000_000)).reset_index(drop=True)
+    if "Attendance_Rate" in sample_df.columns:
+        sample_df["Attendance_Rate"] = sample_df["Attendance_Rate"].round(2)
+    sample_columns = list(sample_df.columns)
+    sample_rows = sample_df.to_dict(orient="records")
+
+    return render_template(
+        "eda.html",
+        plots=EDA_PLOTS,
+        shape_info=shape_info,
+        dtypes_info=dtypes_info,
+        sample_columns=sample_columns,
+        sample_rows=sample_rows,
+    )
 
 
 @app.route("/predict")
@@ -247,41 +297,45 @@ def api_predict():
 
     X_input = pd.DataFrame([input_row])[FEATURES]
 
-    if task == "regression":
-        if model_key not in REGRESSION_MODELS:
-            return jsonify({"error": "Unknown regression model."}), 400
-        bundle = load_bundle(REGRESSION_MODELS[model_key]["pickle"])
-        model = bundle["model"]
-        if "scaler" in bundle and bundle["scaler"] is not None:
-            X_proc = bundle["scaler"].transform(X_input)
-        else:
-            X_proc = X_input.values
-        if "poly" in bundle:
-            X_proc = bundle["poly"].transform(X_proc)
-        pred = float(model.predict(X_proc)[0])
-        return jsonify({"prediction": round(pred, 2), "label": "Predicted Total Score"})
+    try:
+        if task == "regression":
+            if model_key not in REGRESSION_MODELS:
+                return jsonify({"error": "Unknown regression model."}), 400
+            bundle = load_bundle(REGRESSION_MODELS[model_key]["pickle"])
+            model = bundle["model"]
+            if "scaler" in bundle and bundle["scaler"] is not None:
+                X_proc = bundle["scaler"].transform(X_input)
+            else:
+                X_proc = X_input.values
+            if "poly" in bundle:
+                X_proc = bundle["poly"].transform(X_proc)
+            pred = float(model.predict(X_proc)[0])
+            return jsonify({"prediction": round(pred, 2), "label": "Predicted Total Score"})
 
-    elif task == "classification":
-        if model_key not in CLASSIFICATION_MODELS:
-            return jsonify({"error": "Unknown classification model."}), 400
-        bundle = load_bundle(CLASSIFICATION_MODELS[model_key]["pickle"])
-        model = bundle["model"]
-        le = bundle["label_encoder"]
-        if "scaler" in bundle and bundle["scaler"] is not None:
-            X_proc = bundle["scaler"].transform(X_input)
-        else:
-            X_proc = X_input.values
-        pred_idx = int(model.predict(X_proc)[0])
-        pred_label = le.inverse_transform([pred_idx])[0]
+        elif task == "classification":
+            if model_key not in CLASSIFICATION_MODELS:
+                return jsonify({"error": "Unknown classification model."}), 400
+            bundle = load_bundle(CLASSIFICATION_MODELS[model_key]["pickle"])
+            model = bundle["model"]
+            le = bundle["label_encoder"]
+            if "scaler" in bundle and bundle["scaler"] is not None:
+                X_proc = bundle["scaler"].transform(X_input)
+            else:
+                X_proc = X_input.values
+            pred_idx = int(model.predict(X_proc)[0])
+            pred_label = le.inverse_transform([pred_idx])[0]
 
-        proba = None
-        if hasattr(model, "predict_proba"):
-            proba_arr = model.predict_proba(X_proc)[0]
-            proba = {le.inverse_transform([i])[0]: round(float(p), 3) for i, p in enumerate(proba_arr)}
+            proba = None
+            if hasattr(model, "predict_proba"):
+                proba_arr = model.predict_proba(X_proc)[0]
+                proba = {le.inverse_transform([i])[0]: round(float(p), 3) for i, p in enumerate(proba_arr)}
 
-        return jsonify({"prediction": pred_label, "label": "Predicted Performance", "probabilities": proba})
+            return jsonify({"prediction": pred_label, "label": "Predicted Performance", "probabilities": proba})
 
-    return jsonify({"error": "Invalid task type."}), 400
+        return jsonify({"error": "Invalid task type."}), 400
+    except Exception as exc:
+        app.logger.exception("Prediction failed for model=%s task=%s", model_key, task)
+        return jsonify({"error": f"Prediction failed: {exc}"}), 500
 
 
 @app.route("/analyze")

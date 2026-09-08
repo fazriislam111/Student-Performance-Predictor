@@ -342,7 +342,12 @@ xgbr_top3 = top3_importance_plot(FEATURES, importances,
                                   f"{IMPORTANCE_DIR}/xgboost_regression_top3.png")
 results["regression"]["xgboost_regression"]["top3_features"] = xgbr_top3
 
-save_pickle({"model": xgb_reg, "features": FEATURES}, f"{MODEL_DIR}/regression_xgboost.pkl")
+# NOTE: XGBoost's Booster object is fragile to plain pickle() across different
+# xgboost versions/platforms. We save it in XGBoost's own native format (stable
+# across versions) and store only a small pointer + metadata via pickle.
+xgb_reg.save_model(f"{MODEL_DIR}/regression_xgboost_native.json")
+save_pickle({"model_type": "xgb_regressor", "native_path": "regression_xgboost_native.json",
+             "features": FEATURES}, f"{MODEL_DIR}/regression_xgboost.pkl")
 
 print("Regression pipeline complete.")
 print(json.dumps({k: v["metrics"] for k, v in results["regression"].items()}, indent=2))
@@ -622,8 +627,10 @@ xgbc_top3 = top3_importance_plot(FEATURES, importances_c,
                                   f"{IMPORTANCE_DIR}/xgboost_classification_top3.png")
 results["classification"]["xgboost_classification"]["top3_features"] = xgbc_top3
 
-save_pickle({"model": xgb_cls, "label_encoder": le, "features": FEATURES},
-            f"{MODEL_DIR}/classification_xgboost.pkl")
+# Native save format (see note above the regression XGBoost save for why).
+xgb_cls.save_model(f"{MODEL_DIR}/classification_xgboost_native.json")
+save_pickle({"model_type": "xgb_classifier", "native_path": "classification_xgboost_native.json",
+             "label_encoder": le, "features": FEATURES}, f"{MODEL_DIR}/classification_xgboost.pkl")
 
 print("Classification pipeline complete.")
 print(json.dumps({k: v["metrics"] for k, v in results["classification"].items()}, indent=2))

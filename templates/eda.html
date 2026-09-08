@@ -4,6 +4,38 @@
 <h1>Exploratory Data Analysis</h1>
 <p class="subtitle">A visual overview of the student performance dataset before modeling.</p>
 
+<div class="eda-item">
+  <h3>Dataset Snapshot</h3>
+  <p class="shape-line">
+    <strong>{{ shape_info.rows }}</strong> rows &times; <strong>{{ shape_info.columns }}</strong> columns
+  </p>
+  <table class="dtypes-table">
+    <thead><tr><th>Column</th><th>Data Type</th></tr></thead>
+    <tbody>
+      {% for row in dtypes_info %}
+      <tr><td>{{ row.column }}</td><td><code>{{ row.dtype }}</code></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="eda-item">
+  <h3>Random Sample (5 rows)</h3>
+  <div class="table-scroll">
+    <table class="sample-table">
+      <thead>
+        <tr>{% for col in sample_columns %}<th>{{ col }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for row in sample_rows %}
+        <tr>{% for col in sample_columns %}<td>{{ row[col] }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">Refresh the page for a different random sample.</p>
+</div>
+
 <div class="eda-list">
   {% for plot in plots %}
   <div class="eda-item">
