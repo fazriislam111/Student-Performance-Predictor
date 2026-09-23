@@ -1,7 +1,12 @@
 """
 Student Performance Prediction - Model Training Pipeline
 Trains 3 regression models + 5 classification models, generates EDA,
-per-model analysis plots, feature-importance plots, and saves pickles.
+per-model analysis plots, feature-importance plots, and saves models.
+
+Retrained on the updated dataset (2000 rows) provided September 2026.
+Column names differ slightly from the original dataset; they are renamed
+below to the same internal names used throughout app.py, so the web app
+requires no code changes to work with this retrained set of models.
 """
 import json
 import pickle
@@ -18,12 +23,13 @@ from sklearn.preprocessing import StandardScaler, PolynomialFeatures, LabelEncod
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import train_test_split, learning_curve
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     mean_squared_error, mean_absolute_error, r2_score,
     accuracy_score, precision_score, recall_score, f1_score,
-    confusion_matrix, classification_report
+    confusion_matrix
 )
+from sklearn.inspection import permutation_importance
 from xgboost import XGBRegressor, XGBClassifier
 
 warnings.filterwarnings("ignore")
@@ -31,7 +37,8 @@ sns.set_style("whitegrid")
 plt.rcParams["figure.dpi"] = 110
 
 RANDOM_STATE = 42
-DATA_PATH = "data/student_data.csv"
+RAW_DATA_PATH = "data/student_data_raw.csv"
+CLEAN_DATA_PATH = "data/student_data.csv"
 EDA_DIR = "plots/eda"
 ANALYSIS_DIR = "plots/analysis"
 IMPORTANCE_DIR = "plots/importance"
@@ -45,14 +52,24 @@ CLASS_ORDER = ["fail", "poor", "average", "good"]
 # ---------------------------------------------------------------------------
 # Load & clean data
 # ---------------------------------------------------------------------------
-df = pd.read_csv(DATA_PATH)
-df = df.rename(columns={
-    "quiz1_score out of 15": "quiz1_score",
-    "quiz2_score out of 15": "quiz2_score",
-    "assignment_score out of 10": "assignment_score",
-    "total score": REG_TARGET,
+df_raw = pd.read_csv(RAW_DATA_PATH)
+
+# This dataset's raw column names differ from the original project's raw
+# columns, but map onto the exact same underlying features. Renaming here
+# keeps every downstream name (FEATURES, REG_TARGET, ...) identical to the
+# first training run, so app.py needs zero changes to serve these models.
+df = df_raw.rename(columns={
+    "student_ID": "Student_ID",
+    "attendance (%)": "Attendance_Rate",
+    "quiz_1 score (out of 15)": "quiz1_score",
+    "quiz_2 score (out of 15)": "quiz2_score",
+    "assignment score (out of 10)": "assignment_score",
+    "final score (out of 100)": REG_TARGET,
 })
+
+missing_before = df.isna().sum()
 df = df.dropna().reset_index(drop=True)
+df.to_csv(CLEAN_DATA_PATH, index=False)
 
 metadata = {
     "features": FEATURES,
@@ -124,7 +141,7 @@ plt.close(fig)
 fig, axes = plt.subplots(2, 2, figsize=(11, 8))
 for ax, feat in zip(axes.flat, FEATURES):
     sns.scatterplot(x=df[feat], y=df[REG_TARGET], hue=df[CLS_TARGET],
-                     hue_order=CLASS_ORDER, palette="viridis", ax=ax, s=25, legend=False)
+                     hue_order=CLASS_ORDER, palette="viridis", ax=ax, s=18, legend=False, alpha=0.6)
     ax.set_title(f"{feat} vs Total Score")
 fig.suptitle("Feature Relationships with Total Score", fontsize=14, fontweight="bold")
 fig.tight_layout()
@@ -144,10 +161,25 @@ plt.close(fig)
 
 # 7. Pairplot
 pp = sns.pairplot(df[FEATURES + [CLS_TARGET]], hue=CLS_TARGET, hue_order=CLASS_ORDER,
-                   palette="viridis", diag_kind="kde", plot_kws={"s": 15, "alpha": 0.6})
+                   palette="viridis", diag_kind="kde", plot_kws={"s": 10, "alpha": 0.5})
 pp.fig.suptitle("Pairwise Feature Relationships", y=1.02, fontsize=14, fontweight="bold")
 pp.savefig(f"{EDA_DIR}/07_pairplot.png")
 plt.close(pp.fig)
+
+# 8. Missing values check
+fig, ax = plt.subplots(figsize=(8, 4.5))
+all_cols = list(df_raw.columns)
+missing_counts = df_raw.isna().sum()
+bars = ax.bar(all_cols, missing_counts.values, color="#C44E52")
+ax.set_title(f"Missing Values per Column (dataset: {len(df_raw)} rows)")
+ax.set_ylabel("Missing count")
+ax.set_ylim(0, max(1, missing_counts.max() * 1.3))
+plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
+for bar, val in zip(bars, missing_counts.values):
+    ax.text(bar.get_x() + bar.get_width() / 2, val + 0.02 * ax.get_ylim()[1], str(val), ha="center")
+fig.tight_layout()
+fig.savefig(f"{EDA_DIR}/08_missing_values.png")
+plt.close(fig)
 
 print("EDA plots done.")
 
@@ -155,12 +187,53 @@ print("EDA plots done.")
 # HELPER FUNCTIONS
 # ===========================================================================
 
-def save_pickle(obj, path):
+def save_sklearn_pickle(obj, path):
     with open(path, "wb") as f:
         pickle.dump(obj, f)
 
 
-def top3_importance_plot(names, importances, title, path, color="#4C72B0"):
+def save_xgb_bundle(xgb_model, extra, native_filename, path):
+    """Save XGBoost models via their native JSON format (recommended by
+    XGBoost for cross-version stability) instead of raw pickling the
+    Booster. The bundle records model_type + native_path so app.py can
+    reconstruct the estimator; native model saved alongside as its own file."""
+    xgb_model.save_model(f"{MODEL_DIR}/{native_filename}")
+    bundle = {
+        "model_type": "xgb_regressor" if isinstance(xgb_model, XGBRegressor) else "xgb_classifier",
+        "native_path": native_filename,
+        **extra,
+    }
+    save_sklearn_pickle(bundle, path)
+
+
+from sklearn.model_selection import learning_curve as _sk_learning_curve
+
+
+def learning_curve_plot(estimator, X, y, title, path, scoring):
+    """Plot training vs. validation score across increasing training-set
+    sizes -- the standard 'learning curve' diagnostic for models (like
+    Linear/Logistic Regression, Decision Trees, Random Forest, KNN) that
+    don't train iteratively and so have no per-epoch loss curve."""
+    train_sizes, train_scores, val_scores = _sk_learning_curve(
+        estimator, X, y, cv=5, scoring=scoring,
+        train_sizes=np.linspace(0.2, 1.0, 6), random_state=RANDOM_STATE
+    )
+    train_mean = train_scores.mean(axis=1)
+    val_mean = val_scores.mean(axis=1)
+
+    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+    ax.plot(train_sizes, train_mean, marker="o", label="Training score")
+    ax.plot(train_sizes, val_mean, marker="o", label="Validation score")
+    ax.set_xlabel("Training Set Size")
+    ax.set_ylabel(scoring.replace("_", " ").title())
+    ax.set_title(title)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def top3_importance_plot(names, importances, title, path):
     order = np.argsort(importances)[::-1][:3]
     top_names = [names[i] for i in order]
     top_vals = [importances[i] for i in order]
@@ -174,10 +247,6 @@ def top3_importance_plot(names, importances, title, path, color="#4C72B0"):
     return list(zip(top_names, [float(v) for v in top_vals]))
 
 
-def permutation_like_importance_linear(coefs, names):
-    return np.abs(coefs)
-
-
 def metrics_bar_plot(metrics_dict, title, path):
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.barplot(x=list(metrics_dict.keys()), y=list(metrics_dict.values()),
@@ -188,7 +257,6 @@ def metrics_bar_plot(metrics_dict, title, path):
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)
-
 
 # ===========================================================================
 # PART 2: REGRESSION PIPELINE  (target: total_score)
@@ -209,6 +277,9 @@ def reg_metrics(y_true, y_pred):
 # --- 2.1 Linear Regression ---------------------------------------------------
 lin_reg = LinearRegression()
 lin_reg.fit(Xr_train_s, yreg_train)
+learning_curve_plot(LinearRegression(), Xr_train_s, yreg_train,
+                     "Linear Regression - Learning Curve",
+                     f"{ANALYSIS_DIR}/linear_regression_learning_curve.png", scoring="r2")
 lin_pred = lin_reg.predict(Xr_test_s)
 lin_metrics = reg_metrics(yreg_test, lin_pred)
 results["regression"]["linear_regression"] = {
@@ -217,15 +288,14 @@ results["regression"]["linear_regression"] = {
     "feature_engineering": "StandardScaler applied to all 4 numeric features.",
 }
 
-# Residuals + actual vs predicted + coefficients (one combined analysis PNG)
 residuals = yreg_test - lin_pred
 fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
-axes[0].scatter(lin_pred, residuals, alpha=0.6, color="#4C72B0")
+axes[0].scatter(lin_pred, residuals, alpha=0.5, color="#4C72B0")
 axes[0].axhline(0, color="red", linestyle="--")
 axes[0].set_xlabel("Predicted Total Score"); axes[0].set_ylabel("Residual")
 axes[0].set_title("Residual Plot")
 
-axes[1].scatter(yreg_test, lin_pred, alpha=0.6, color="#55A868")
+axes[1].scatter(yreg_test, lin_pred, alpha=0.5, color="#55A868")
 lims = [min(yreg_test.min(), lin_pred.min()), max(yreg_test.max(), lin_pred.max())]
 axes[1].plot(lims, lims, "r--")
 axes[1].set_xlabel("Actual"); axes[1].set_ylabel("Predicted")
@@ -249,7 +319,8 @@ lr_top3 = top3_importance_plot(FEATURES, np.abs(lin_reg.coef_),
                                 f"{IMPORTANCE_DIR}/linear_regression_top3.png")
 results["regression"]["linear_regression"]["top3_features"] = lr_top3
 
-save_pickle({"model": lin_reg, "scaler": reg_scaler, "features": FEATURES}, f"{MODEL_DIR}/regression_linear_regression.pkl")
+save_sklearn_pickle({"model": lin_reg, "scaler": reg_scaler, "features": FEATURES},
+                     f"{MODEL_DIR}/regression_linear_regression.pkl")
 
 # --- 2.2 Polynomial Regression ----------------------------------------------
 poly = PolynomialFeatures(degree=2, include_bias=False)
@@ -258,6 +329,9 @@ Xr_test_poly = poly.transform(Xr_test_s)
 
 poly_reg = LinearRegression()
 poly_reg.fit(Xr_train_poly, yreg_train)
+learning_curve_plot(LinearRegression(), Xr_train_poly, yreg_train,
+                     "Polynomial Regression - Learning Curve",
+                     f"{ANALYSIS_DIR}/polynomial_regression_learning_curve.png", scoring="r2")
 poly_pred = poly_reg.predict(Xr_test_poly)
 poly_metrics = reg_metrics(yreg_test, poly_pred)
 results["regression"]["polynomial_regression"] = {
@@ -268,14 +342,12 @@ results["regression"]["polynomial_regression"] = {
 
 poly_residuals = yreg_test - poly_pred
 fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
-# Fit visualization: use attendance rate (strongest single feature) vs predictions
-order_idx = np.argsort(X_test["Attendance_Rate"].values)
-axes[0].scatter(X_test["Attendance_Rate"], yreg_test, alpha=0.5, label="Actual", color="#4C72B0")
-axes[0].scatter(X_test["Attendance_Rate"], poly_pred, alpha=0.5, label="Predicted", color="#DD8452")
+axes[0].scatter(X_test["Attendance_Rate"], yreg_test, alpha=0.4, label="Actual", color="#4C72B0", s=15)
+axes[0].scatter(X_test["Attendance_Rate"], poly_pred, alpha=0.4, label="Predicted", color="#DD8452", s=15)
 axes[0].set_xlabel("Attendance Rate"); axes[0].set_ylabel("Total Score")
 axes[0].set_title("Polynomial Fit Visualization"); axes[0].legend()
 
-axes[1].scatter(poly_pred, poly_residuals, alpha=0.6, color="#C44E52")
+axes[1].scatter(poly_pred, poly_residuals, alpha=0.5, color="#C44E52")
 axes[1].axhline(0, color="red", linestyle="--")
 axes[1].set_xlabel("Predicted"); axes[1].set_ylabel("Residual")
 axes[1].set_title("Residual Analysis")
@@ -294,8 +366,8 @@ poly_top3 = top3_importance_plot(list(poly_feat_names), np.abs(poly_reg.coef_),
                                   f"{IMPORTANCE_DIR}/polynomial_regression_top3.png")
 results["regression"]["polynomial_regression"]["top3_features"] = poly_top3
 
-save_pickle({"model": poly_reg, "scaler": reg_scaler, "poly": poly, "features": FEATURES},
-            f"{MODEL_DIR}/regression_polynomial_regression.pkl")
+save_sklearn_pickle({"model": poly_reg, "scaler": reg_scaler, "poly": poly, "features": FEATURES},
+                     f"{MODEL_DIR}/regression_polynomial_regression.pkl")
 
 # --- 2.3 XGBoost Regressor ---------------------------------------------------
 xgb_reg = XGBRegressor(n_estimators=200, max_depth=4, learning_rate=0.05,
@@ -323,7 +395,7 @@ sorted_idx = np.argsort(importances)
 axes[1].barh(np.array(FEATURES)[sorted_idx], importances[sorted_idx], color="#4C72B0")
 axes[1].set_title("Feature Importance (Gain-based)")
 
-axes[2].scatter(yreg_test, xgb_pred, alpha=0.6, color="#55A868")
+axes[2].scatter(yreg_test, xgb_pred, alpha=0.5, color="#55A868")
 lims = [min(yreg_test.min(), xgb_pred.min()), max(yreg_test.max(), xgb_pred.max())]
 axes[2].plot(lims, lims, "r--")
 axes[2].set_xlabel("Actual"); axes[2].set_ylabel("Predicted")
@@ -342,12 +414,8 @@ xgbr_top3 = top3_importance_plot(FEATURES, importances,
                                   f"{IMPORTANCE_DIR}/xgboost_regression_top3.png")
 results["regression"]["xgboost_regression"]["top3_features"] = xgbr_top3
 
-# NOTE: XGBoost's Booster object is fragile to plain pickle() across different
-# xgboost versions/platforms. We save it in XGBoost's own native format (stable
-# across versions) and store only a small pointer + metadata via pickle.
-xgb_reg.save_model(f"{MODEL_DIR}/regression_xgboost_native.json")
-save_pickle({"model_type": "xgb_regressor", "native_path": "regression_xgboost_native.json",
-             "features": FEATURES}, f"{MODEL_DIR}/regression_xgboost.pkl")
+save_xgb_bundle(xgb_reg, {"features": FEATURES}, "regression_xgboost_native.json",
+                 f"{MODEL_DIR}/regression_xgboost.pkl")
 
 print("Regression pipeline complete.")
 print(json.dumps({k: v["metrics"] for k, v in results["regression"].items()}, indent=2))
@@ -380,12 +448,8 @@ def confusion_plot(y_true, y_pred, title, path):
     fig.savefig(path)
     plt.close(fig)
 
-# Train two "2D" reference models (on the two most informative features) purely
-# for decision-boundary visualization purposes.
 boundary_feats = ["Attendance_Rate", "quiz1_score"]
-Xb_train = cls_scaler.fit_transform(X_train)  # reuse scaler fit (already fit above too, refit ok)
 Xb_train_2d = X_train[boundary_feats].values
-Xb_test_2d = X_test[boundary_feats].values
 b_scaler = StandardScaler().fit(Xb_train_2d)
 Xb_train_2d_s = b_scaler.transform(Xb_train_2d)
 
@@ -397,7 +461,7 @@ def plot_decision_boundary(model_2d, X2d, y2d, title, path, feat_names):
     Z = model_2d.predict(np.c_[xx.ravel(), yy.ravel()])
     Z = Z.reshape(xx.shape)
     ax.contourf(xx, yy, Z, alpha=0.3, cmap="viridis")
-    scatter = ax.scatter(X2d[:, 0], X2d[:, 1], c=y2d, cmap="viridis", edgecolor="k", s=25)
+    scatter = ax.scatter(X2d[:, 0], X2d[:, 1], c=y2d, cmap="viridis", edgecolor="k", s=14, linewidths=0.3)
     ax.set_xlabel(feat_names[0] + " (scaled)"); ax.set_ylabel(feat_names[1] + " (scaled)")
     ax.set_title(title)
     handles, _ = scatter.legend_elements()
@@ -409,6 +473,9 @@ def plot_decision_boundary(model_2d, X2d, y2d, title, path, feat_names):
 # --- 3.1 Logistic Regression --------------------------------------------------
 log_reg = LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)
 log_reg.fit(Xc_train_s, ycls_train)
+learning_curve_plot(LogisticRegression(max_iter=1000, random_state=RANDOM_STATE), Xc_train_s, ycls_train,
+                     "Logistic Regression - Learning Curve",
+                     f"{ANALYSIS_DIR}/logistic_regression_learning_curve.png", scoring="accuracy")
 log_pred = log_reg.predict(Xc_test_s)
 log_proba = log_reg.predict_proba(Xc_test_s)
 log_metrics = cls_metrics(ycls_test, log_pred)
@@ -448,12 +515,15 @@ log_top3 = top3_importance_plot(FEATURES, log_importance,
                                  f"{IMPORTANCE_DIR}/logistic_regression_top3.png")
 results["classification"]["logistic_regression"]["top3_features"] = log_top3
 
-save_pickle({"model": log_reg, "scaler": cls_scaler, "label_encoder": le, "features": FEATURES},
-            f"{MODEL_DIR}/classification_logistic_regression.pkl")
+save_sklearn_pickle({"model": log_reg, "scaler": cls_scaler, "label_encoder": le, "features": FEATURES},
+                     f"{MODEL_DIR}/classification_logistic_regression.pkl")
 
 # --- 3.2 Decision Tree --------------------------------------------------------
-dt = DecisionTreeClassifier(max_depth=5, min_samples_leaf=8, random_state=RANDOM_STATE)
+dt = DecisionTreeClassifier(max_depth=6, min_samples_leaf=10, random_state=RANDOM_STATE)
 dt.fit(X_train, ycls_train)
+learning_curve_plot(DecisionTreeClassifier(max_depth=6, min_samples_leaf=10, random_state=RANDOM_STATE),
+                     X_train, ycls_train, "Decision Tree - Learning Curve",
+                     f"{ANALYSIS_DIR}/decision_tree_learning_curve.png", scoring="accuracy")
 dt_pred = dt.predict(X_test)
 dt_metrics = cls_metrics(ycls_test, dt_pred)
 results["classification"]["decision_tree"] = {
@@ -469,7 +539,7 @@ fig.tight_layout()
 fig.savefig(f"{ANALYSIS_DIR}/decision_tree_analysis.png")
 plt.close(fig)
 
-dt_2d = DecisionTreeClassifier(max_depth=5, min_samples_leaf=8, random_state=RANDOM_STATE).fit(Xb_train_2d, ycls_train)
+dt_2d = DecisionTreeClassifier(max_depth=6, min_samples_leaf=10, random_state=RANDOM_STATE).fit(Xb_train_2d, ycls_train)
 plot_decision_boundary(dt_2d, Xb_train_2d, ycls_train,
                         "Decision Tree Decision Boundary\n(Attendance_Rate vs quiz1_score)",
                         f"{ANALYSIS_DIR}/decision_tree_boundary.png", boundary_feats)
@@ -483,13 +553,16 @@ dt_top3 = top3_importance_plot(FEATURES, dt.feature_importances_,
                                 f"{IMPORTANCE_DIR}/decision_tree_top3.png")
 results["classification"]["decision_tree"]["top3_features"] = dt_top3
 
-save_pickle({"model": dt, "label_encoder": le, "features": FEATURES},
-            f"{MODEL_DIR}/classification_decision_tree.pkl")
+save_sklearn_pickle({"model": dt, "label_encoder": le, "features": FEATURES},
+                     f"{MODEL_DIR}/classification_decision_tree.pkl")
 
 # --- 3.3 Random Forest --------------------------------------------------------
-rf = RandomForestClassifier(n_estimators=300, max_depth=8, min_samples_leaf=4,
+rf = RandomForestClassifier(n_estimators=300, max_depth=10, min_samples_leaf=4,
                              oob_score=True, random_state=RANDOM_STATE)
 rf.fit(X_train, ycls_train)
+learning_curve_plot(RandomForestClassifier(n_estimators=300, max_depth=10, min_samples_leaf=4, random_state=RANDOM_STATE),
+                     X_train, ycls_train, "Random Forest - Learning Curve",
+                     f"{ANALYSIS_DIR}/random_forest_learning_curve.png", scoring="accuracy")
 rf_pred = rf.predict(X_test)
 rf_metrics = cls_metrics(ycls_test, rf_pred)
 rf_metrics["OOB_Score"] = float(rf.oob_score_)
@@ -499,10 +572,9 @@ results["classification"]["random_forest"] = {
     "feature_engineering": "None required (tree-based); raw numeric features used directly.",
 }
 
-# OOB error vs number of trees
 oob_errors = []
 tree_counts = list(range(20, 320, 20))
-rf_oob = RandomForestClassifier(warm_start=True, oob_score=True, max_depth=8,
+rf_oob = RandomForestClassifier(warm_start=True, oob_score=True, max_depth=10,
                                  min_samples_leaf=4, random_state=RANDOM_STATE, n_estimators=1)
 for n in tree_counts:
     rf_oob.set_params(n_estimators=n)
@@ -535,12 +607,15 @@ rf_top3 = top3_importance_plot(FEATURES, importances,
                                 f"{IMPORTANCE_DIR}/random_forest_top3.png")
 results["classification"]["random_forest"]["top3_features"] = rf_top3
 
-save_pickle({"model": rf, "label_encoder": le, "features": FEATURES},
-            f"{MODEL_DIR}/classification_random_forest.pkl")
+save_sklearn_pickle({"model": rf, "label_encoder": le, "features": FEATURES},
+                     f"{MODEL_DIR}/classification_random_forest.pkl")
 
 # --- 3.4 KNN -------------------------------------------------------------------
-knn = KNeighborsClassifier(n_neighbors=9)
+knn = KNeighborsClassifier(n_neighbors=15)
 knn.fit(Xc_train_s, ycls_train)
+learning_curve_plot(KNeighborsClassifier(n_neighbors=15), Xc_train_s, ycls_train,
+                     "KNN - Learning Curve",
+                     f"{ANALYSIS_DIR}/knn_learning_curve.png", scoring="accuracy")
 knn_pred = knn.predict(Xc_test_s)
 knn_metrics = cls_metrics(ycls_test, knn_pred)
 results["classification"]["knn"] = {
@@ -549,13 +624,12 @@ results["classification"]["knn"] = {
     "feature_engineering": "StandardScaler applied to all 4 numeric features (distance-based model).",
 }
 
-knn_2d = KNeighborsClassifier(n_neighbors=9).fit(Xb_train_2d_s, ycls_train)
+knn_2d = KNeighborsClassifier(n_neighbors=15).fit(Xb_train_2d_s, ycls_train)
 plot_decision_boundary(knn_2d, Xb_train_2d_s, ycls_train,
-                        "KNN Decision Boundary (k=9)\n(Attendance_Rate vs quiz1_score)",
+                        "KNN Decision Boundary (k=15)\n(Attendance_Rate vs quiz1_score)",
                         f"{ANALYSIS_DIR}/knn_boundary.png", boundary_feats)
 
-# Accuracy vs k (neighbor influence)
-k_values = list(range(1, 25, 2))
+k_values = list(range(1, 35, 2))
 k_accuracies = []
 for k in k_values:
     knn_k = KNeighborsClassifier(n_neighbors=k).fit(Xc_train_s, ycls_train)
@@ -563,7 +637,7 @@ for k in k_values:
 
 fig, ax = plt.subplots(figsize=(6.5, 4.5))
 ax.plot(k_values, k_accuracies, marker="o", color="#C44E52")
-ax.axvline(9, color="gray", linestyle="--", label="chosen k=9")
+ax.axvline(15, color="gray", linestyle="--", label="chosen k=15")
 ax.set_xlabel("k (Number of Neighbors)"); ax.set_ylabel("Test Accuracy")
 ax.set_title("Neighbor Influence: Accuracy vs k")
 ax.legend()
@@ -574,16 +648,14 @@ plt.close(fig)
 confusion_plot(ycls_test, knn_pred, "KNN - Confusion Matrix", f"{ANALYSIS_DIR}/knn_confusion.png")
 metrics_bar_plot(knn_metrics, "KNN - Test Metrics", f"{ANALYSIS_DIR}/knn_metrics.png")
 
-# KNN has no native feature importance -> permutation importance
-from sklearn.inspection import permutation_importance
 perm = permutation_importance(knn, Xc_test_s, ycls_test, n_repeats=20, random_state=RANDOM_STATE)
 knn_top3 = top3_importance_plot(FEATURES, perm.importances_mean,
                                  "KNN - Top 3 Features (Permutation Importance)",
                                  f"{IMPORTANCE_DIR}/knn_top3.png")
 results["classification"]["knn"]["top3_features"] = knn_top3
 
-save_pickle({"model": knn, "scaler": cls_scaler, "label_encoder": le, "features": FEATURES},
-            f"{MODEL_DIR}/classification_knn.pkl")
+save_sklearn_pickle({"model": knn, "scaler": cls_scaler, "label_encoder": le, "features": FEATURES},
+                     f"{MODEL_DIR}/classification_knn.pkl")
 
 # --- 3.5 XGBoost Classifier ----------------------------------------------------
 xgb_cls = XGBClassifier(n_estimators=200, max_depth=4, learning_rate=0.05,
@@ -627,10 +699,8 @@ xgbc_top3 = top3_importance_plot(FEATURES, importances_c,
                                   f"{IMPORTANCE_DIR}/xgboost_classification_top3.png")
 results["classification"]["xgboost_classification"]["top3_features"] = xgbc_top3
 
-# Native save format (see note above the regression XGBoost save for why).
-xgb_cls.save_model(f"{MODEL_DIR}/classification_xgboost_native.json")
-save_pickle({"model_type": "xgb_classifier", "native_path": "classification_xgboost_native.json",
-             "label_encoder": le, "features": FEATURES}, f"{MODEL_DIR}/classification_xgboost.pkl")
+save_xgb_bundle(xgb_cls, {"label_encoder": le, "features": FEATURES}, "classification_xgboost_native.json",
+                 f"{MODEL_DIR}/classification_xgboost.pkl")
 
 print("Classification pipeline complete.")
 print(json.dumps({k: v["metrics"] for k, v in results["classification"].items()}, indent=2))

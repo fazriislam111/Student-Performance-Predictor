@@ -2,9 +2,9 @@
   "regression": {
     "linear_regression": {
       "metrics": {
-        "RMSE": 20.20726618281621,
-        "MAE": 16.69194636019449,
-        "R2": 0.1532133186501795
+        "RMSE": 4.7840320768967075,
+        "MAE": 3.8651904266857118,
+        "R2": 0.8264623923737455
       },
       "params": {
         "copy_X": true,
@@ -17,23 +17,23 @@
       "top3_features": [
         [
           "quiz2_score",
-          5.305435119178056
-        ],
-        [
-          "assignment_score",
-          3.4686667276165686
+          4.067480225157264
         ],
         [
           "quiz1_score",
-          3.3565677349195715
+          3.852063502645942
+        ],
+        [
+          "Attendance_Rate",
+          3.5964061899230795
         ]
       ]
     },
     "polynomial_regression": {
       "metrics": {
-        "RMSE": 20.70975253009611,
-        "MAE": 17.18041296615134,
-        "R2": 0.1105762692141663
+        "RMSE": 4.797616484171708,
+        "MAE": 3.859715507470656,
+        "R2": 0.8254754623262018
       },
       "params": {
         "degree": 2,
@@ -47,23 +47,23 @@
       "top3_features": [
         [
           "quiz2_score",
-          5.06259611636888
-        ],
-        [
-          "assignment_score",
-          3.417866144379866
+          4.07906930498203
         ],
         [
           "quiz1_score",
-          3.3248197742516994
+          3.8431719670296234
+        ],
+        [
+          "Attendance_Rate",
+          3.592773447459764
         ]
       ]
     },
     "xgboost_regression": {
       "metrics": {
-        "RMSE": 21.78248012577281,
-        "MAE": 18.002586364746094,
-        "R2": 0.016048848628997803
+        "RMSE": 4.933420934844434,
+        "MAE": 3.970571994781494,
+        "R2": 0.8154551982879639
       },
       "params": {
         "objective": "reg:squarederror",
@@ -110,16 +110,16 @@
       "feature_engineering": "None required (tree-based); raw numeric features used directly.",
       "top3_features": [
         [
-          "assignment_score",
-          0.27420663833618164
+          "quiz2_score",
+          0.31679844856262207
         ],
         [
-          "quiz2_score",
-          0.2736207842826843
+          "Attendance_Rate",
+          0.27533668279647827
         ],
         [
           "quiz1_score",
-          0.2285502403974533
+          0.2699539363384247
         ]
       ]
     }
@@ -127,10 +127,10 @@
   "classification": {
     "logistic_regression": {
       "metrics": {
-        "Accuracy": 0.4507042253521127,
-        "Precision": 0.22666666666666668,
-        "Recall": 0.32164634146341464,
-        "F1": 0.264714737317477
+        "Accuracy": 0.8225,
+        "Precision": 0.8450638508778043,
+        "Recall": 0.6453099188393306,
+        "F1": 0.677937076861808
       },
       "params": {
         "C": 1.0,
@@ -151,35 +151,35 @@
       "feature_engineering": "StandardScaler applied to all 4 numeric features.",
       "top3_features": [
         [
-          "assignment_score",
-          0.19953567218483131
+          "quiz2_score",
+          1.389042756237823
         ],
         [
           "quiz1_score",
-          0.1987130509874478
+          1.3458903584569568
         ],
         [
-          "quiz2_score",
-          0.19141043457924853
+          "Attendance_Rate",
+          1.040197664706804
         ]
       ]
     },
     "decision_tree": {
       "metrics": {
-        "Accuracy": 0.4084507042253521,
-        "Precision": 0.3235542020425741,
-        "Recall": 0.3143873403019744,
-        "F1": 0.30493147421482136
+        "Accuracy": 0.8,
+        "Precision": 0.7087569358741388,
+        "Recall": 0.6138152696976227,
+        "F1": 0.6437321141405001
       },
       "params": {
         "ccp_alpha": 0.0,
         "class_weight": null,
         "criterion": "gini",
-        "max_depth": 5,
+        "max_depth": 6,
         "max_features": null,
         "max_leaf_nodes": null,
         "min_impurity_decrease": 0.0,
-        "min_samples_leaf": 8,
+        "min_samples_leaf": 10,
         "min_samples_split": 2,
         "min_weight_fraction_leaf": 0.0,
         "monotonic_cst": null,
@@ -189,33 +189,33 @@
       "feature_engineering": "None required (tree-based); raw numeric features used directly.",
       "top3_features": [
         [
-          "quiz2_score",
-          0.2948376260544719
+          "assignment_score",
+          0.457804233701784
         ],
         [
           "Attendance_Rate",
-          0.2574664182227435
+          0.27106344519813336
         ],
         [
           "quiz1_score",
-          0.22650235817191308
+          0.13728481056139932
         ]
       ]
     },
     "random_forest": {
       "metrics": {
-        "Accuracy": 0.38028169014084506,
-        "Precision": 0.19782608695652176,
-        "Recall": 0.27047038327526135,
-        "F1": 0.22673594709494566,
-        "OOB_Score": 0.36925795053003535
+        "Accuracy": 0.8175,
+        "Precision": 0.8595428562430122,
+        "Recall": 0.6241129785247432,
+        "F1": 0.6722107674684995,
+        "OOB_Score": 0.775625
       },
       "params": {
         "bootstrap": true,
         "ccp_alpha": 0.0,
         "class_weight": null,
         "criterion": "gini",
-        "max_depth": 8,
+        "max_depth": 10,
         "max_features": "sqrt",
         "max_leaf_nodes": null,
         "max_samples": null,
@@ -235,24 +235,24 @@
       "top3_features": [
         [
           "Attendance_Rate",
-          0.3136290760474989
+          0.3097494700044389
         ],
         [
           "quiz2_score",
-          0.242350722921859
+          0.24820354556716953
         ],
         [
           "quiz1_score",
-          0.2244644906117517
+          0.23599528325423585
         ]
       ]
     },
     "knn": {
       "metrics": {
-        "Accuracy": 0.3873239436619718,
-        "Precision": 0.3341349795485532,
-        "Recall": 0.29682055749128916,
-        "F1": 0.2846140293908346
+        "Accuracy": 0.8,
+        "Precision": 0.5836589702570791,
+        "Recall": 0.5569022480787187,
+        "F1": 0.5681215827037857
       },
       "params": {
         "algorithm": "auto",
@@ -260,32 +260,32 @@
         "metric": "minkowski",
         "metric_params": null,
         "n_jobs": null,
-        "n_neighbors": 9,
+        "n_neighbors": 15,
         "p": 2,
         "weights": "uniform"
       },
       "feature_engineering": "StandardScaler applied to all 4 numeric features (distance-based model).",
       "top3_features": [
         [
-          "quiz2_score",
-          0.03415492957746478
+          "quiz1_score",
+          0.09487500000000004
         ],
         [
-          "assignment_score",
-          0.031690140845070415
+          "quiz2_score",
+          0.07362500000000002
         ],
         [
           "Attendance_Rate",
-          0.007042253521126749
+          0.06912500000000005
         ]
       ]
     },
     "xgboost_classification": {
       "metrics": {
-        "Accuracy": 0.38028169014084506,
-        "Precision": 0.269813829787234,
-        "Recall": 0.27805603948896634,
-        "F1": 0.2508116883116883
+        "Accuracy": 0.82,
+        "Precision": 0.72612567966357,
+        "Recall": 0.6859459168282697,
+        "F1": 0.704131851521459
       },
       "params": {
         "objective": "multi:softprob",
@@ -333,16 +333,16 @@
       "feature_engineering": "None required (tree-based); raw numeric features used directly.",
       "top3_features": [
         [
-          "Attendance_Rate",
-          0.2611558437347412
+          "assignment_score",
+          0.30340996384620667
         ],
         [
           "quiz2_score",
-          0.2520226836204529
+          0.2793956696987152
         ],
         [
-          "assignment_score",
-          0.24803224205970764
+          "quiz1_score",
+          0.2202470302581787
         ]
       ]
     }
