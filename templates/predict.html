@@ -17,12 +17,12 @@
 
     <div id="feature-inputs"><strong>3. Student Data</strong></div>
 
-    <button id="predict-btn">Predict</button>
+    <button id="predict-btn">Get Recommendation</button>
   </div>
 
   <div class="panel result-panel">
-    <h3>Result</h3>
-    <div id="result-box" class="result-box">Fill in the form and click Predict.</div>
+    <h3>Recommendation</h3>
+    <div id="result-box" class="result-box">Fill in the student's data and click Predict to get a recommendation.</div>
     <div id="proba-box"></div>
   </div>
 </div>
@@ -32,7 +32,7 @@ const regModels = {{ reg_models | tojson }};
 const clsModels = {{ cls_models | tojson }};
 const features = {{ features | tojson }};
 const featureLabels = {{ feature_labels | tojson }};
-const featureRanges = {{ feature_ranges | tojson }};
+const featureExamples = {{ feature_examples | tojson }};
 
 const taskSelect = document.getElementById('task-select');
 const modelSelect = document.getElementById('model-select');
@@ -54,7 +54,7 @@ function populateModels() {
 function buildFeatureInputs() {
   featureInputsDiv.innerHTML = '<strong>3. Student Data</strong>';
   features.forEach(f => {
-    const range = featureRanges[f];
+    const example = featureExamples[f];
     const wrapper = document.createElement('div');
     wrapper.className = 'input-row';
     const label = document.createElement('label');
@@ -63,7 +63,7 @@ function buildFeatureInputs() {
     input.type = 'number';
     input.step = 'any';
     input.id = 'feat-' + f;
-    input.placeholder = `e.g. ${((range[0]+range[1])/2).toFixed(1)} (range ${range[0].toFixed(1)}-${range[1].toFixed(1)})`;
+    input.placeholder = `e.g. ${example}`;
     wrapper.appendChild(label);
     wrapper.appendChild(input);
     featureInputsDiv.appendChild(wrapper);
@@ -107,7 +107,7 @@ document.getElementById('predict-btn').addEventListener('click', async () => {
       resultBox.className = 'result-box error';
       return;
     }
-    resultBox.innerHTML = `<span class="result-label">${data.label}:</span> <span class="result-value">${data.prediction}</span>`;
+    resultBox.innerHTML = `<p class="decision-statement">${data.message}</p>`;
     resultBox.className = 'result-box success';
 
     if (data.probabilities) {

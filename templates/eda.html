@@ -41,7 +41,7 @@
   <div class="eda-item">
     <h3>{{ plot.title }}</h3>
     <img src="{{ url_for('static', filename='plots/eda/' + plot.file) }}" alt="{{ plot.title }}">
-    <p>{{ plot.desc }}</p>
+    <p class="insight">{{ plot.desc }}</p>
   </div>
   {% endfor %}
 </div>

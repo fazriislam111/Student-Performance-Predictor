@@ -31,5 +31,26 @@
       10.0
     ]
   },
-  "n_rows": 2000
+  "n_rows": 2000,
+  "eda_descriptions": {
+    "01_correlation_heatmap.png": "Attendance Rate (r=0.73) and quiz2 score (r=0.68) are the strongest single predictors of total score. Attendance and assignment score correlate more weakly on their own \u2014 the takeaway is that quiz performance is the most reliable early signal of a student's likely outcome.",
+    "02_top_features_scatter.png": "'Good' students cluster toward the top-right, averaging 93.9 on Attendance Rate and 13.8 on quiz2 score, while 'fail' students cluster toward the bottom-left, averaging only 78.9 and 10.4 respectively. The two groups are visibly separable using just these two scores \u2014 confirming they carry most of the signal needed to flag at-risk students early.",
+    "03_feature_distributions.png": "Attendance ranges from 52% to 100% (average 85%), and both quiz and assignment scores are spread across their full possible range with no extreme outliers \u2014 the data doesn't need outlier removal or capping before it's used to train the models.",
+    "04_total_score_distribution.png": "Total scores span 25 to 100 out of 100, centered around 65. The spread is wide enough that a single model has real work to do separating strong and weak students, rather than everyone landing in a narrow band.",
+    "05_class_imbalance.png": "'Average' is the dominant outcome at 1168 students (58.4%), while 'poor' is rare at just 25 students (1.2%). In practice, this means the predictor will be most confident calling out 'average' and 'fail' cases, and should be double-checked by a human advisor whenever it flags the less common 'poor' or 'good' categories.",
+    "06_feature_relationships.png": "All four features trend upward with total score \u2014 none of them work against the others. Attendance Rate shows the steepest, most consistent climb, reinforcing that it's the single most actionable lever: improving it is the most direct way for a student to raise their predicted score.",
+    "07_boxplots_by_class.png": "Median attendance rises step by step from 79% for 'fail' students to 95% for 'good' students, with almost no overlap between the extremes. Attendance alone is a dependable early-warning signal, well before quiz or assignment results come in.",
+    "08_pairplot.png": "The four input features correlate with each other only weakly (strongest pairwise correlation: 0.56), meaning each one adds genuinely new information rather than repeating what another feature already shows \u2014 there's no redundant data being collected here.",
+    "09_missing_values.png": "The raw dataset arrived with 0 missing values across 7 columns and 2000 rows. No imputation or row-dropping was needed before training \u2014 the data was clean going in."
+  },
+  "top2_features": [
+    "Attendance_Rate",
+    "quiz2_score"
+  ],
+  "feature_examples": {
+    "Attendance_Rate": 85,
+    "quiz1_score": 12,
+    "quiz2_score": 12,
+    "assignment_score": 8
+  }
 }

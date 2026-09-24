@@ -1,4 +1,4 @@
-Student_ID,Attendance_Rate,quiz1_score,quiz2_score,assignment_score,total_score,performance
+student_ID,attendance (%),quiz_1 score (out of 15),quiz_2 score (out of 15),assignment score (out of 10),final score (out of 100),performance
 S1000,84,11,13,7,72,average
 S1001,91,9,14,6,56,fail
 S1002,73,10,9,7,56,fail

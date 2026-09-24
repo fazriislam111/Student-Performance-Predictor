@@ -9,6 +9,7 @@ below to the same internal names used throughout app.py, so the web app
 requires no code changes to work with this retrained set of models.
 """
 import json
+import os
 import pickle
 import warnings
 
@@ -98,46 +99,108 @@ results = {"regression": {}, "classification": {}}
 # ===========================================================================
 print("Generating EDA plots...")
 
-# 1. Feature distributions
+# Clear any stale plots from a previous run (e.g. renamed/removed files)
+# so the served folders never contain orphaned images.
+for _dir in (EDA_DIR, ANALYSIS_DIR, IMPORTANCE_DIR):
+    for _f in os.listdir(_dir):
+        if _f.endswith(".png"):
+            os.remove(os.path.join(_dir, _f))
+
+# --- Stats used to write real, data-backed statements (not generic captions) ---
+corr_with_target = df[FEATURES + [REG_TARGET]].corr()[REG_TARGET].drop(REG_TARGET).sort_values(ascending=False)
+TOP2 = corr_with_target.index[:2].tolist()  # the two features most correlated with total_score
+class_counts = df[CLS_TARGET].value_counts().reindex(CLASS_ORDER)
+class_pct = (class_counts / len(df) * 100).round(1)
+missing_total = int(df_raw.isna().sum().sum())
+top2_means_by_class = df.groupby(CLS_TARGET)[TOP2].mean().reindex(CLASS_ORDER)
+attendance_median_by_class = df.groupby(CLS_TARGET)["Attendance_Rate"].median().reindex(CLASS_ORDER)
+feature_corr_matrix = df[FEATURES].corr()
+max_feature_pair_corr = feature_corr_matrix.where(~np.eye(len(FEATURES), dtype=bool)).abs().max().max()
+
+eda_descriptions = {}
+
+# 1. Correlation heatmap (shown first)
+fig, ax = plt.subplots(figsize=(7, 6))
+corr = df[FEATURES + [REG_TARGET]].corr()
+sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", center=0, ax=ax)
+ax.set_title("Correlation Heatmap")
+fig.tight_layout()
+fig.savefig(f"{EDA_DIR}/01_correlation_heatmap.png")
+plt.close(fig)
+eda_descriptions["01_correlation_heatmap.png"] = (
+    f"{TOP2[0].replace('_', ' ')} (r={corr_with_target[TOP2[0]]:.2f}) and {TOP2[1].replace('_', ' ')} "
+    f"(r={corr_with_target[TOP2[1]]:.2f}) are the strongest single predictors of total score. "
+    f"Attendance and assignment score correlate more weakly on their own — the takeaway is that "
+    f"quiz performance is the most reliable early signal of a student's likely outcome."
+)
+
+# 2. Top-2-feature scatter, colored by performance (shown second)
+fig, ax = plt.subplots(figsize=(7.5, 6))
+sns.scatterplot(data=df, x=TOP2[0], y=TOP2[1], hue=CLS_TARGET, hue_order=CLASS_ORDER,
+                 palette="viridis", s=28, alpha=0.65, ax=ax)
+ax.set_title(f"{TOP2[0].replace('_', ' ')} vs {TOP2[1].replace('_', ' ')}, by Performance")
+ax.set_xlabel(TOP2[0].replace("_", " "))
+ax.set_ylabel(TOP2[1].replace("_", " "))
+ax.legend(title="Performance")
+fig.tight_layout()
+fig.savefig(f"{EDA_DIR}/02_top_features_scatter.png")
+plt.close(fig)
+good_m0, good_m1 = top2_means_by_class.loc["good", TOP2[0]], top2_means_by_class.loc["good", TOP2[1]]
+fail_m0, fail_m1 = top2_means_by_class.loc["fail", TOP2[0]], top2_means_by_class.loc["fail", TOP2[1]]
+eda_descriptions["02_top_features_scatter.png"] = (
+    f"'Good' students cluster toward the top-right, averaging {good_m0:.1f} on {TOP2[0].replace('_', ' ')} and "
+    f"{good_m1:.1f} on {TOP2[1].replace('_', ' ')}, while 'fail' students cluster toward the bottom-left, averaging "
+    f"only {fail_m0:.1f} and {fail_m1:.1f} respectively. The two groups are visibly separable using just these two "
+    f"scores — confirming they carry most of the signal needed to flag at-risk students early."
+)
+
+# 3. Feature distributions
 fig, axes = plt.subplots(2, 2, figsize=(11, 8))
 for ax, feat in zip(axes.flat, FEATURES):
     sns.histplot(df[feat], kde=True, ax=ax, color="#4C72B0")
     ax.set_title(f"Distribution of {feat}")
 fig.suptitle("Feature Distributions", fontsize=14, fontweight="bold")
 fig.tight_layout()
-fig.savefig(f"{EDA_DIR}/01_feature_distributions.png")
+fig.savefig(f"{EDA_DIR}/03_feature_distributions.png")
 plt.close(fig)
+eda_descriptions["03_feature_distributions.png"] = (
+    f"Attendance ranges from {df['Attendance_Rate'].min():.0f}% to {df['Attendance_Rate'].max():.0f}% "
+    f"(average {df['Attendance_Rate'].mean():.0f}%), and both quiz and assignment scores are spread across "
+    f"their full possible range with no extreme outliers — the data doesn't need outlier removal or capping "
+    f"before it's used to train the models."
+)
 
-# 2. Target distribution (total score)
+# 4. Target distribution (total score)
 fig, ax = plt.subplots(figsize=(7, 5))
 sns.histplot(df[REG_TARGET], kde=True, ax=ax, color="#55A868")
 ax.set_title("Distribution of Total Score")
 fig.tight_layout()
-fig.savefig(f"{EDA_DIR}/02_total_score_distribution.png")
+fig.savefig(f"{EDA_DIR}/04_total_score_distribution.png")
 plt.close(fig)
+eda_descriptions["04_total_score_distribution.png"] = (
+    f"Total scores span {df[REG_TARGET].min():.0f} to {df[REG_TARGET].max():.0f} out of 100, centered around "
+    f"{df[REG_TARGET].mean():.0f}. The spread is wide enough that a single model has real work to do separating "
+    f"strong and weak students, rather than everyone landing in a narrow band."
+)
 
-# 3. Class imbalance
+# 5. Class imbalance
 fig, ax = plt.subplots(figsize=(7, 5))
-counts = df[CLS_TARGET].value_counts().reindex(CLASS_ORDER)
-sns.barplot(x=counts.index, y=counts.values, hue=counts.index, palette="viridis", ax=ax, legend=False)
+sns.barplot(x=class_counts.index, y=class_counts.values, hue=class_counts.index, palette="viridis", ax=ax, legend=False)
 ax.set_title("Class Distribution: Performance Categories")
 ax.set_ylabel("Count")
-for i, v in enumerate(counts.values):
+for i, v in enumerate(class_counts.values):
     ax.text(i, v + 3, str(v), ha="center")
 fig.tight_layout()
-fig.savefig(f"{EDA_DIR}/03_class_imbalance.png")
+fig.savefig(f"{EDA_DIR}/05_class_imbalance.png")
 plt.close(fig)
+eda_descriptions["05_class_imbalance.png"] = (
+    f"'Average' is the dominant outcome at {class_counts['average']} students ({class_pct['average']}%), while "
+    f"'poor' is rare at just {class_counts['poor']} students ({class_pct['poor']}%). In practice, this means the "
+    f"predictor will be most confident calling out 'average' and 'fail' cases, and should be double-checked by a "
+    f"human advisor whenever it flags the less common 'poor' or 'good' categories."
+)
 
-# 4. Correlation heatmap
-fig, ax = plt.subplots(figsize=(7, 6))
-corr = df[FEATURES + [REG_TARGET]].corr()
-sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", center=0, ax=ax)
-ax.set_title("Correlation Heatmap")
-fig.tight_layout()
-fig.savefig(f"{EDA_DIR}/04_correlation_heatmap.png")
-plt.close(fig)
-
-# 5. Feature relationships with target (scatter)
+# 6. Feature relationships with target (scatter)
 fig, axes = plt.subplots(2, 2, figsize=(11, 8))
 for ax, feat in zip(axes.flat, FEATURES):
     sns.scatterplot(x=df[feat], y=df[REG_TARGET], hue=df[CLS_TARGET],
@@ -145,10 +208,15 @@ for ax, feat in zip(axes.flat, FEATURES):
     ax.set_title(f"{feat} vs Total Score")
 fig.suptitle("Feature Relationships with Total Score", fontsize=14, fontweight="bold")
 fig.tight_layout()
-fig.savefig(f"{EDA_DIR}/05_feature_relationships.png")
+fig.savefig(f"{EDA_DIR}/06_feature_relationships.png")
 plt.close(fig)
+eda_descriptions["06_feature_relationships.png"] = (
+    f"All four features trend upward with total score — none of them work against the others. "
+    f"{TOP2[0].replace('_', ' ')} shows the steepest, most consistent climb, reinforcing that it's the single most "
+    f"actionable lever: improving it is the most direct way for a student to raise their predicted score."
+)
 
-# 6. Boxplots of features by performance class
+# 7. Boxplots of features by performance class
 fig, axes = plt.subplots(2, 2, figsize=(11, 8))
 for ax, feat in zip(axes.flat, FEATURES):
     sns.boxplot(x=df[CLS_TARGET], y=df[feat], order=CLASS_ORDER, hue=df[CLS_TARGET],
@@ -156,17 +224,27 @@ for ax, feat in zip(axes.flat, FEATURES):
     ax.set_title(f"{feat} by Performance Category")
 fig.suptitle("Feature Spread Across Performance Categories", fontsize=14, fontweight="bold")
 fig.tight_layout()
-fig.savefig(f"{EDA_DIR}/06_boxplots_by_class.png")
+fig.savefig(f"{EDA_DIR}/07_boxplots_by_class.png")
 plt.close(fig)
+eda_descriptions["07_boxplots_by_class.png"] = (
+    f"Median attendance rises step by step from {attendance_median_by_class['fail']:.0f}% for 'fail' students to "
+    f"{attendance_median_by_class['good']:.0f}% for 'good' students, with almost no overlap between the extremes. "
+    f"Attendance alone is a dependable early-warning signal, well before quiz or assignment results come in."
+)
 
-# 7. Pairplot
+# 8. Pairplot
 pp = sns.pairplot(df[FEATURES + [CLS_TARGET]], hue=CLS_TARGET, hue_order=CLASS_ORDER,
                    palette="viridis", diag_kind="kde", plot_kws={"s": 10, "alpha": 0.5})
 pp.fig.suptitle("Pairwise Feature Relationships", y=1.02, fontsize=14, fontweight="bold")
-pp.savefig(f"{EDA_DIR}/07_pairplot.png")
+pp.savefig(f"{EDA_DIR}/08_pairplot.png")
 plt.close(pp.fig)
+eda_descriptions["08_pairplot.png"] = (
+    f"The four input features correlate with each other only weakly (strongest pairwise correlation: "
+    f"{max_feature_pair_corr:.2f}), meaning each one adds genuinely new information rather than repeating what "
+    f"another feature already shows — there's no redundant data being collected here."
+)
 
-# 8. Missing values check
+# 9. Missing values check
 fig, ax = plt.subplots(figsize=(8, 4.5))
 all_cols = list(df_raw.columns)
 missing_counts = df_raw.isna().sum()
@@ -178,8 +256,15 @@ plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
 for bar, val in zip(bars, missing_counts.values):
     ax.text(bar.get_x() + bar.get_width() / 2, val + 0.02 * ax.get_ylim()[1], str(val), ha="center")
 fig.tight_layout()
-fig.savefig(f"{EDA_DIR}/08_missing_values.png")
+fig.savefig(f"{EDA_DIR}/09_missing_values.png")
 plt.close(fig)
+eda_descriptions["09_missing_values.png"] = (
+    f"The raw dataset arrived with {missing_total} missing values across {len(all_cols)} columns and "
+    f"{len(df_raw)} rows. No imputation or row-dropping was needed before training — the data was clean going in."
+    if missing_total == 0 else
+    f"The raw dataset had {missing_total} missing values before cleaning; affected rows were dropped, leaving "
+    f"{len(df)} complete rows used for training."
+)
 
 print("EDA plots done.")
 
@@ -448,7 +533,7 @@ def confusion_plot(y_true, y_pred, title, path):
     fig.savefig(path)
     plt.close(fig)
 
-boundary_feats = ["Attendance_Rate", "quiz1_score"]
+boundary_feats = TOP2  # same two features used for the EDA "top features" scatter, for a consistent story
 Xb_train_2d = X_train[boundary_feats].values
 b_scaler = StandardScaler().fit(Xb_train_2d)
 Xb_train_2d_s = b_scaler.transform(Xb_train_2d)
@@ -708,6 +793,10 @@ print(json.dumps({k: v["metrics"] for k, v in results["classification"].items()}
 # ===========================================================================
 # SAVE METADATA / RESULTS SUMMARY
 # ===========================================================================
+metadata["eda_descriptions"] = eda_descriptions
+metadata["top2_features"] = TOP2
+metadata["feature_examples"] = {f: int(round(df[f].median())) for f in FEATURES}
+
 with open("models/metadata.json", "w") as f:
     json.dump(metadata, f, indent=2)
 

@@ -63,7 +63,7 @@ document.querySelectorAll('.model-btn').forEach(btn => {
     data.plots.forEach(p => {
       plotsHtml += `<div class="analysis-plot">
         <img src="/static/plots/analysis/${p.file}" alt="${p.file}">
-        <p>${p.desc}</p>
+        <p class="insight">${p.desc}</p>
       </div>`;
     });
 
@@ -83,6 +83,7 @@ document.querySelectorAll('.model-btn').forEach(btn => {
           <h4>Top 3 Important Features</h4>
           ${top3Html}
           <img class="importance-img" src="/static/plots/importance/${data.importance_plot}" alt="Top 3 feature importance">
+          <p class="plot-statement insight">${data.importance_statement}</p>
         </div>
       </div>
 

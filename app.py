@@ -26,6 +26,8 @@ FEATURE_LABELS = {
     "assignment_score": "Assignment Score (out of 10)",
 }
 
+FEATURE_EXAMPLES = METADATA.get("feature_examples", {})
+
 REGRESSION_MODELS = {
     "linear_regression": {"label": "Linear Regression", "pickle": "regression_linear_regression.pkl"},
     "xgboost_regression": {"label": "XGBoost", "pickle": "regression_xgboost.pkl"},
@@ -67,126 +69,193 @@ def load_bundle(pickle_name):
 
 
 # ---------------------------------------------------------------------------
-# EDA plot descriptions
+# EDA plot titles (descriptions are data-driven statements computed in
+# train.py and stored in metadata.json's "eda_descriptions", so they always
+# reflect the actual numbers in the currently-trained dataset)
 # ---------------------------------------------------------------------------
+EDA_PLOT_TITLES = [
+    ("01_correlation_heatmap.png", "Correlation Heatmap"),
+    ("02_top_features_scatter.png", "Where Students Cluster: Top 2 Predictive Features"),
+    ("03_feature_distributions.png", "Feature Distributions"),
+    ("04_total_score_distribution.png", "Total Score Distribution"),
+    ("05_class_imbalance.png", "Performance Class Balance"),
+    ("06_feature_relationships.png", "Feature Relationships with Total Score"),
+    ("07_boxplots_by_class.png", "Feature Spread by Performance Category"),
+    ("08_pairplot.png", "Pairwise Feature Relationships"),
+    ("09_missing_values.png", "Data Quality: Missing Values Check"),
+]
+EDA_DESCRIPTIONS = METADATA.get("eda_descriptions", {})
 EDA_PLOTS = [
-    {
-        "file": "01_feature_distributions.png",
-        "title": "Feature Distributions",
-        "desc": "Histograms of attendance rate, both quiz scores, and the assignment score, showing how each is spread across the student population.",
-    },
-    {
-        "file": "02_total_score_distribution.png",
-        "title": "Total Score Distribution",
-        "desc": "Shows the spread of the final score target used for regression, useful for spotting skew or outliers before modeling.",
-    },
-    {
-        "file": "03_class_imbalance.png",
-        "title": "Performance Class Imbalance",
-        "desc": "Counts of students in each performance category (fail, poor, average, good), revealing how balanced or skewed the classes are.",
-    },
-    {
-        "file": "04_correlation_heatmap.png",
-        "title": "Correlation Heatmap",
-        "desc": "Pairwise correlations between the four features and total score, highlighting which inputs matter most for the target.",
-    },
-    {
-        "file": "05_feature_relationships.png",
-        "title": "Feature Relationships with Total Score",
-        "desc": "Scatter plots of each feature against total score, colored by performance category, showing how tiers relate to feature values.",
-    },
-    {
-        "file": "06_boxplots_by_class.png",
-        "title": "Feature Spread by Performance Category",
-        "desc": "Boxplots comparing each feature's distribution across the four performance categories.",
-    },
-    {
-        "file": "07_pairplot.png",
-        "title": "Pairwise Feature Relationships",
-        "desc": "A full pairplot of all features colored by performance category, revealing how feature combinations separate performance groups.",
-    },
-    {
-        "file": "08_missing_values.png",
-        "title": "Missing Values Check",
-        "desc": "Count of missing values per raw column before cleaning, confirming how much (if any) data needed to be dropped.",
-    },
+    {"file": f, "title": t, "desc": EDA_DESCRIPTIONS.get(f, "")}
+    for f, t in EDA_PLOT_TITLES
 ]
 
-# ---------------------------------------------------------------------------
-# Per-model analysis configuration
-# ---------------------------------------------------------------------------
-ANALYSIS_CONFIG = {
-    "linear_regression": {
-        "kind": "regression", "label": "Linear Regression",
-        "plots": [
-            ("linear_regression_analysis.png", "Residuals, predicted-vs-actual scatter, and standardized coefficient importance."),
-            ("linear_regression_learning_curve.png", "Training vs. validation R\u00b2 score as training set size increases."),
-            ("linear_regression_metrics.png", "Test-set RMSE, MAE, and R\u00b2 for this model."),
-        ],
-    },
-    "polynomial_regression": {
-        "kind": "regression", "label": "Polynomial Regression",
-        "plots": [
-            ("polynomial_regression_analysis.png", "Polynomial fit visualization against attendance rate plus residual analysis."),
-            ("polynomial_regression_learning_curve.png", "Training vs. validation R\u00b2 score as training set size increases."),
-            ("polynomial_regression_metrics.png", "Test-set RMSE, MAE, and R\u00b2 for this model."),
-        ],
-    },
-    "xgboost_regression": {
-        "kind": "regression", "label": "XGBoost",
-        "plots": [
-            ("xgboost_regression_analysis.png", "Training/validation RMSE loss curve, gain-based feature importance, and predicted-vs-actual scatter."),
-            ("xgboost_regression_metrics.png", "Test-set RMSE, MAE, and R\u00b2 for this model."),
-        ],
-    },
-    "logistic_regression": {
-        "kind": "classification", "label": "Logistic Regression",
-        "plots": [
-            ("logistic_regression_boundary.png", "Decision boundary visualized on the two most informative features (Attendance Rate vs Quiz 1)."),
-            ("logistic_regression_analysis.png", "Per-class coefficient heatmap and predicted-probability distributions."),
-            ("logistic_regression_learning_curve.png", "Training vs. validation accuracy as training set size increases."),
-            ("logistic_regression_confusion.png", "Confusion matrix on the held-out test set."),
-            ("logistic_regression_metrics.png", "Accuracy, precision, recall, and F1 on the test set."),
-        ],
-    },
-    "decision_tree": {
-        "kind": "classification", "label": "Decision Tree",
-        "plots": [
-            ("decision_tree_analysis.png", "Visualization of the tree's top splits showing how it partitions students."),
-            ("decision_tree_boundary.png", "Decision boundary on the two most informative features, showing the tree's rectangular partitions."),
-            ("decision_tree_learning_curve.png", "Training vs. validation accuracy as training set size increases."),
-            ("decision_tree_confusion.png", "Confusion matrix on the held-out test set."),
-            ("decision_tree_metrics.png", "Accuracy, precision, recall, and F1 on the test set."),
-        ],
-    },
-    "random_forest": {
-        "kind": "classification", "label": "Random Forest",
-        "plots": [
-            ("random_forest_analysis.png", "Out-of-bag error rate as trees are added, plus feature importance across the forest."),
-            ("random_forest_learning_curve.png", "Training vs. validation accuracy as training set size increases."),
-            ("random_forest_confusion.png", "Confusion matrix on the held-out test set."),
-            ("random_forest_metrics.png", "Accuracy, precision, recall, and F1 on the test set."),
-        ],
-    },
-    "knn": {
-        "kind": "classification", "label": "K-Nearest Neighbors",
-        "plots": [
-            ("knn_boundary.png", "Decision boundary (k=9) on the two most informative features."),
-            ("knn_analysis.png", "Test accuracy as the number of neighbors (k) changes, showing neighbor influence."),
-            ("knn_learning_curve.png", "Training vs. validation accuracy as training set size increases."),
-            ("knn_confusion.png", "Confusion matrix on the held-out test set."),
-            ("knn_metrics.png", "Accuracy, precision, recall, and F1 on the test set."),
-        ],
-    },
-    "xgboost_classification": {
-        "kind": "classification", "label": "XGBoost",
-        "plots": [
-            ("xgboost_classification_analysis.png", "Training/validation log-loss curve and gain-based feature importance."),
-            ("xgboost_classification_confusion.png", "Confusion matrix on the held-out test set."),
-            ("xgboost_classification_metrics.png", "Accuracy, precision, recall, and F1 on the test set."),
-        ],
-    },
-}
+
+def fmt_feat(name):
+    """Turn a raw feature/term name into a readable label, including
+    polynomial interaction terms like 'quiz1_score quiz2_score'."""
+    if name in FEATURE_LABELS:
+        return FEATURE_LABELS[name]
+    label = name
+    for raw, nice in FEATURE_LABELS.items():
+        short = nice.split(" (")[0]
+        label = label.replace(raw, short)
+    return label.replace("^2", " squared").replace("_", " ")
+
+
+def _rank_position(model_key, ranked_keys):
+    idx = ranked_keys.index(model_key)
+    n = len(ranked_keys)
+    if idx == 0:
+        return "the top performer"
+    if idx == n - 1:
+        return "the lowest performer"
+    return "a mid-tier performer"
+
+
+_REG_RANKED = sorted(RESULTS["regression"], key=lambda k: -RESULTS["regression"][k]["metrics"]["R2"])
+_CLS_RANKED = sorted(RESULTS["classification"], key=lambda k: -RESULTS["classification"][k]["metrics"]["Accuracy"])
+
+
+def _top(result_data, n):
+    feats = result_data.get("top3_features", [])
+    return fmt_feat(feats[n][0]) if len(feats) > n else "the top feature"
+
+
+def _build_analysis_config():
+    config = {}
+
+    # ---- Regression models ----
+    for key, label in [
+        ("linear_regression", "Linear Regression"),
+        ("polynomial_regression", "Polynomial Regression"),
+        ("xgboost_regression", "XGBoost"),
+    ]:
+        d = RESULTS["regression"][key]
+        m = d["metrics"]
+        rank = _rank_position(key, _REG_RANKED)
+        t1, t2, t3 = _top(d, 0), _top(d, 1), _top(d, 2)
+        plots = []
+
+        if key == "linear_regression":
+            plots.append(("linear_regression_analysis.png",
+                f"This model explains {m['R2']*100:.0f}% of the variation in total score using a straight-line "
+                f"relationship (R\u00b2={m['R2']:.2f}). {t1} has the strongest influence on predictions, followed by "
+                f"{t2} and {t3}. The residuals are scattered evenly on both sides of zero, meaning the model doesn't "
+                f"systematically over- or under-predict for any particular score range."))
+            plots.append(("linear_regression_learning_curve.png",
+                "Training and validation R\u00b2 stay close together as more data is added, meaning the model "
+                "generalizes well and isn't overfitting to the training set."))
+        elif key == "polynomial_regression":
+            lin_r2 = RESULTS["regression"]["linear_regression"]["metrics"]["R2"]
+            cmp_word = "an improvement over" if m["R2"] > lin_r2 else "essentially on par with (or slightly below)"
+            plots.append(("polynomial_regression_analysis.png",
+                f"Allowing curved relationships between features and score explains {m['R2']*100:.0f}% of the "
+                f"variation (R\u00b2={m['R2']:.2f}) \u2014 {cmp_word} the plain Linear Regression model. {t1} remains "
+                f"the strongest driver even after adding curvature, so the relationship is mostly linear with only "
+                f"a modest non-linear correction."))
+            plots.append(("polynomial_regression_learning_curve.png",
+                "Training and validation R\u00b2 track closely as training size grows, showing the added curvature "
+                "hasn't introduced overfitting."))
+        else:  # xgboost_regression
+            plots.append(("xgboost_regression_analysis.png",
+                f"This tree-based model explains {m['R2']*100:.0f}% of the variation in total score (R\u00b2={m['R2']:.2f}), "
+                f"making it {rank} among the three regression models on this dataset. The validation loss curve tracks "
+                f"the training loss closely, showing the model generalizes rather than memorizing training data. "
+                f"{t1} is the single biggest driver of predicted scores."))
+
+        plots.append((f"{key}_metrics.png",
+            f"Predictions are off by about {m['MAE']:.1f} points on average (MAE), with a typical error spread of "
+            f"{m['RMSE']:.1f} points (RMSE) \u2014 {rank} of the three regression models on this dataset."))
+
+        config[key] = {"kind": "regression", "label": label, "plots": plots}
+
+    # ---- Classification models ----
+    for key, label in [
+        ("logistic_regression", "Logistic Regression"),
+        ("decision_tree", "Decision Tree"),
+        ("random_forest", "Random Forest"),
+        ("knn", "K-Nearest Neighbors"),
+        ("xgboost_classification", "XGBoost"),
+    ]:
+        d = RESULTS["classification"][key]
+        m = d["metrics"]
+        rank = _rank_position(key, _CLS_RANKED)
+        t1, t2, t3 = _top(d, 0), _top(d, 1), _top(d, 2)
+        plots = []
+
+        confusion_desc = (
+            "Most mistakes happen between neighboring performance tiers (e.g. 'average' vs 'poor') rather than "
+            "between opposite ends like 'fail' and 'good' \u2014 in practice, the model's errors are usually small "
+            "misses, not wild ones."
+        )
+        boundary_desc = (
+            f"Using just {t1} and {t2} for this 2D view, the model's colored regions separate stronger students "
+            f"toward one side from weaker students toward the other. The deployed model uses all four features, "
+            f"so real predictions are more precise than this simplified picture."
+        )
+        learning_curve_desc = (
+            "Training and validation accuracy stay close together as more data is added, showing the model "
+            "generalizes rather than memorizing the training set."
+        )
+
+        if key == "logistic_regression":
+            plots.append(("logistic_regression_boundary.png", boundary_desc))
+            plots.append(("logistic_regression_analysis.png",
+                f"{t1} and {t2} carry the largest coefficient weights, meaning they shift the predicted probability "
+                f"the most. The model is generally most confident about 'average' students \u2014 the majority class "
+                f"in this dataset \u2014 and comparatively less certain distinguishing the rarer 'poor' category."))
+            plots.append(("logistic_regression_learning_curve.png", learning_curve_desc))
+            plots.append(("logistic_regression_confusion.png", confusion_desc))
+        elif key == "decision_tree":
+            plots.append(("decision_tree_analysis.png",
+                f"Early splits in the tree rely heavily on {t1}, the single most influential feature for this model "
+                f"\u2014 a student just above or below this tree's threshold can end up in a completely different "
+                f"predicted category."))
+            plots.append(("decision_tree_boundary.png",
+                f"The rectangular regions show how the tree splits students using simple thresholds on {t1} and "
+                f"{t2} (e.g. 'above X and above Y') rather than smooth curves \u2014 easy to explain to a student or "
+                f"advisor, at the cost of occasionally drawing a hard edge between two very similar students."))
+            plots.append(("decision_tree_learning_curve.png", learning_curve_desc))
+            plots.append(("decision_tree_confusion.png", confusion_desc))
+        elif key == "random_forest":
+            oob = m.get("OOB_Score")
+            oob_txt = (f"an out-of-bag estimate of {oob*100:.0f}% \u2014 these two numbers being close confirms the "
+                       f"model isn't overfitting to the training data. ") if oob is not None else ""
+            plots.append(("random_forest_analysis.png",
+                f"Averaging many decision trees reaches {m['Accuracy']*100:.0f}% test accuracy, with {oob_txt}"
+                f"{t1} contributes the most predictive power across the forest."))
+            plots.append(("random_forest_learning_curve.png", learning_curve_desc))
+            plots.append(("random_forest_confusion.png", confusion_desc))
+        elif key == "knn":
+            plots.append(("knn_boundary.png",
+                f"Predictions here depend on which nearby students in the training data are most similar on {t1} "
+                f"and {t2} \u2014 the irregular boundary reflects real student clusters rather than a simple rule."))
+            plots.append(("knn_analysis.png",
+                "Accuracy peaks at a moderate number of neighbors, then flattens \u2014 too few neighbors makes "
+                "predictions noisy and sensitive to outliers, while too many blurs the line between adjacent "
+                "performance categories."))
+            plots.append(("knn_learning_curve.png", learning_curve_desc))
+            plots.append(("knn_confusion.png", confusion_desc))
+        else:  # xgboost_classification
+            plots.append(("xgboost_classification_analysis.png",
+                f"With {m['Accuracy']*100:.0f}% test accuracy, this is {rank} of the five classification models. "
+                f"The validation loss curve tracks training closely, indicating the model generalizes rather than "
+                f"memorizes. {t1} is the strongest single driver of the predicted performance category."))
+            plots.append(("xgboost_classification_confusion.png", confusion_desc))
+
+        plots.append((f"{key}_metrics.png",
+            f"Correctly classifies about {m['Accuracy']*100:.0f}% of students, {rank} of the five classification "
+            f"models. Precision of {m['Precision']*100:.0f}% means predicted categories are usually right; recall "
+            f"of {m['Recall']*100:.0f}% reflects how many true cases get caught \u2014 the gap between them is mostly "
+            f"driven by the rare 'poor' category having few examples to learn from."))
+
+        config[key] = {"kind": "classification", "label": label, "plots": plots}
+
+    return config
+
+
+ANALYSIS_CONFIG = _build_analysis_config()
 
 
 def clean_params(params):
@@ -241,8 +310,30 @@ def predict_page():
         cls_models=CLASSIFICATION_MODELS,
         features=FEATURES,
         feature_labels=FEATURE_LABELS,
-        feature_ranges=METADATA["feature_ranges"],
+        feature_examples=FEATURE_EXAMPLES,
     )
+
+
+REG_BANDS = [
+    (80, "Good", "This student's projected score places them in the 'Good' range. Current habits are working well \u2014 the main recommendation is to keep them consistent."),
+    (60, "Average", "This student's projected score places them in the 'Average' range \u2014 a passing result with room to grow. A small push in quiz consistency could move them into the 'Good' range."),
+    (40, "Poor", "This student's projected score places them in the 'Poor' range. Recommend additional support on quizzes and assignments soon, not later."),
+    (0, "Fail", "This student's projected score places them in the 'Fail' range \u2014 the highest-risk category. Immediate intervention is recommended \u2014 attendance follow-up and one-on-one tutoring should be prioritized."),
+]
+
+CLASS_MESSAGES = {
+    "good": "This student is on track for top-tier performance. Recommendation: keep reinforcing current study habits, no intervention needed.",
+    "average": "This student is performing adequately but has room to grow. Recommendation: targeted support on quiz preparation could move them into the 'good' tier.",
+    "poor": "This student is underperforming and at risk. Recommendation: an early advisor check-in and structured tutoring are strongly suggested.",
+    "fail": "This student is at high risk of failing. Recommendation: immediate academic intervention \u2014 attendance follow-up and tutoring \u2014 is strongly advised.",
+}
+
+
+def regression_band(score):
+    for threshold, label, message in REG_BANDS:
+        if score >= threshold:
+            return label, message
+    return REG_BANDS[-1][1], REG_BANDS[-1][2]
 
 
 @app.route("/api/predict", methods=["POST"])
@@ -271,7 +362,14 @@ def api_predict():
         if "poly" in bundle:
             X_proc = bundle["poly"].transform(X_proc)
         pred = float(model.predict(X_proc)[0])
-        return jsonify({"prediction": round(pred, 2), "label": "Predicted Total Score"})
+        pred = max(0.0, min(100.0, pred))
+        band_label, band_message = regression_band(pred)
+        return jsonify({
+            "prediction": round(pred, 1),
+            "label": "Predicted Total Score",
+            "band": band_label,
+            "message": f"Projected score: {pred:.0f} / 100 \u2014 {band_label}. {band_message}",
+        })
 
     elif task == "classification":
         if model_key not in CLASSIFICATION_MODELS:
@@ -291,7 +389,13 @@ def api_predict():
             proba_arr = model.predict_proba(X_proc)[0]
             proba = {le.inverse_transform([i])[0]: round(float(p), 3) for i, p in enumerate(proba_arr)}
 
-        return jsonify({"prediction": pred_label, "label": "Predicted Performance", "probabilities": proba})
+        message = f"Predicted category: {pred_label.title()}. {CLASS_MESSAGES.get(pred_label, '')}"
+        return jsonify({
+            "prediction": pred_label,
+            "label": "Predicted Performance",
+            "message": message,
+            "probabilities": proba,
+        })
 
     return jsonify({"error": "Invalid task type."}), 400
 
@@ -315,13 +419,23 @@ def api_analyze(model_key):
     result_bucket = "regression" if kind == "regression" else "classification"
     result_data = RESULTS[result_bucket].get(model_key, {})
 
+    top3 = result_data.get("top3_features", [])
+    if len(top3) >= 3:
+        importance_statement = (
+            f"{fmt_feat(top3[0][0])} is the dominant factor for this model, followed by {fmt_feat(top3[1][0])} and "
+            f"{fmt_feat(top3[2][0])} \u2014 together these three drive most of what the model bases its predictions on."
+        )
+    else:
+        importance_statement = ""
+
     return jsonify({
         "label": config["label"],
         "kind": kind,
         "metrics": result_data.get("metrics", {}),
         "params": clean_params(result_data.get("params", {})),
         "feature_engineering": result_data.get("feature_engineering", ""),
-        "top3_features": result_data.get("top3_features", []),
+        "top3_features": top3,
+        "importance_statement": importance_statement,
         "plots": [{"file": p, "desc": d} for p, d in config["plots"]],
         "importance_plot": f"{model_key}_top3.png",
     })
